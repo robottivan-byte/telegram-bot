@@ -121,8 +121,8 @@ def ask_gpt(question: str) -> str:
             max_tokens=500
         )
         return response.choices[0].message.content
-    except:
-        return "Не могу ответить прямо сейчас 😅"
+    except Exception as e:
+        return f"Ошибка: {e}"
 
 async def morning_digest(context: ContextTypes.DEFAULT_TYPE):
     weather = get_weather()
