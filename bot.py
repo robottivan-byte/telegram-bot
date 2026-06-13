@@ -8,7 +8,9 @@ from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTyp
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 ALLOWED_CHAT_IDS = [-5102540817, -437147591]
 AWAY_THRESHOLD_HOURS = 3
+INACTIVE_MINUTES = 60
 LAST_SEEN_FILE = "last_seen.json"
+LAST_CHAT_ACTIVITY_FILE = "last_chat_activity.json"
 
 GREETINGS = [
     "Привет, {name}! Тебя не было {time} 👋",
@@ -18,16 +20,26 @@ GREETINGS = [
     "Привет-привет, {name}! Где был {time}? 😄",
 ]
 
+TOPICS = [
+    "Что-то тихо стало 🤔 Давайте обсудим — какой фильм последний смотрели?",
+    "Тишина... 😴 Кто что делает? Расскажите!",
+    "Эй, живые есть? 👀 Давайте поговорим о чём-нибудь интересном!",
+    "Скучновато что-то 🥱 Какие планы на выходные?",
+    "Час тишины — это много 😅 Поделитесь чем-нибудь интересным!",
+    "Ау! 📢 Кто что слушает сейчас?",
+    "Тихо как в библиотеке 📚 Давайте оживим чат!",
+]
+
 REACTIONS = ["👍","❤","🔥","🎉","🤩","💯","👏","😁","🏆","⚡","🥰","😱","🤣","💔","😎"]
 
-def load_last_seen():
-    if os.path.exists(LAST_SEEN_FILE):
-        with open(LAST_SEEN_FILE, "r", encoding="utf-8") as f:
+def load_json(filename):
+    if os.path.exists(filename):
+        with open(filename, "r", encoding="utf-8") as f:
             return json.load(f)
     return {}
 
-def save_last_seen(data):
-    with open(LAST_SEEN_FILE, "w", encoding="utf-8") as f:
+def save_json(filename, data):
+    with open(filename, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 def format_duration(delta: timedelta) -> str:
@@ -41,29 +53,6 @@ def format_duration(delta: timedelta) -> str:
     else:
         return f"{hours} ч {minutes} мин"
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_chat.id not in ALLOWED_CHAT_IDS:
-        return
-    user = update.effective_user
-    if not user:
-        return
-    user_id = str(user.id)
-    user_name = user.first_name or user.username or "друг"
+async def check_inactive_chats(context: ContextTypes.DEFAULT_TYPE):
     now = datetime.utcnow()
-    last_seen = load_last_seen()
-    if user_id in last_seen:
-        last_time = datetime.fromisoformat(last_seen[user_id])
-        delta = now - last_time
-        if delta >= timedelta(hours=AWAY_THRESHOLD_HOURS):
-            time_str = format_duration(delta)
-            greeting = GREETINGS[user.id % len(GREETINGS)].format(name=user_name, time=time_str)
-            await update.message.reply_text(greeting)
-    last_seen[user_id] = now.isoformat()
-    save_last_seen(last_seen)
-    await update.message.set_reaction([ReactionTypeEmoji(emoji=random.choice(REACTIONS))])
-
-if __name__ == "__main__":
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
-    app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, handle_message))
-    print("Бот запущен!")
-    app.run_polling()
+    chat_activity =
