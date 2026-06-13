@@ -6,7 +6,7 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
-ALLOWED_CHAT_ID = -5102540817
+ALLOWED_CHAT_IDS = [-5102540817, -437147591]
 AWAY_THRESHOLD_HOURS = 6
 LAST_SEEN_FILE = "last_seen.json"
 
@@ -31,7 +31,7 @@ def save_last_seen(data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_chat.id != ALLOWED_CHAT_ID:
+    if update.effective_chat.id not in ALLOWED_CHAT_IDS:
         return
     user = update.effective_user
     if not user:
