@@ -115,7 +115,7 @@ def ask_gpt(question: str) -> str:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "Ты дружелюбный участник группового чата друзей. Отвечай коротко, по-русски, неформально."},
+                {"role": "system", "content": "Ты — Пятница, дружелюбный бот для группового чата друзей. Версия 4. Отвечай коротко, по-русски, неформально. Ты не помнишь предыдущие сообщения в чате — только то что написали тебе прямо сейчас."},
                 {"role": "user", "content": question}
             ],
             max_tokens=500
