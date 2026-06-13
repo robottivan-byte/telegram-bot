@@ -62,7 +62,7 @@ def format_duration(delta: timedelta) -> str:
 
 async def check_inactive_chats(context: ContextTypes.DEFAULT_TYPE):
     now = datetime.utcnow()
-    moscow_hour = (now.hour + 3) % 24  # UTC+3
+    moscow_hour = (now.hour + 3) % 24
     if moscow_hour < 9 or moscow_hour >= 23:
         return
     chat_activity = load_json(LAST_CHAT_ACTIVITY_FILE)
@@ -88,24 +88,4 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     last_seen = load_json(LAST_SEEN_FILE)
     if user_id in last_seen:
-        last_time = datetime.fromisoformat(last_seen[user_id])
-        delta = now - last_time
-        if delta >= timedelta(hours=AWAY_THRESHOLD_HOURS):
-            time_str = format_duration(delta)
-            greeting = GREETINGS[user.id % len(GREETINGS)].format(name=user_name, time=time_str)
-            await update.message.reply_text(greeting)
-    last_seen[user_id] = now.isoformat()
-    save_json(LAST_SEEN_FILE, last_seen)
-
-    chat_activity = load_json(LAST_CHAT_ACTIVITY_FILE)
-    chat_activity[chat_id] = now.isoformat()
-    save_json(LAST_CHAT_ACTIVITY_FILE, chat_activity)
-
-    await update.message.set_reaction([ReactionTypeEmoji(emoji=random.choice(REACTIONS))])
-
-if __name__ == "__main__":
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
-    app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, handle_message))
-    app.job_queue.run_repeating(check_inactive_chats, interval=600, first=60)
-    print("Бот запущен!")
-    app.run_polling()
+        last_time =
