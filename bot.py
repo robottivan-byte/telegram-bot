@@ -15,8 +15,10 @@ ALLOWED_CHAT_IDS = [-5102540817, -437147591]
 BOT_USERNAME = "Fuckbook1Bot"
 AWAY_THRESHOLD_HOURS = 3
 INACTIVE_HOURS = 3
+HISTORY_LIMIT = 50
 LAST_SEEN_FILE = "last_seen.json"
 LAST_CHAT_ACTIVITY_FILE = "last_chat_activity.json"
+CHAT_HISTORY_FILE = "chat_history.json"
 CITY = "Saint Petersburg"
 
 GREETINGS = [
@@ -67,6 +69,18 @@ def format_duration(delta: timedelta) -> str:
     else:
         return f"{hours} ч {minutes} мин"
 
+def add_to_history(chat_id: str, name: str, text: str):
+    history = load_json(CHAT_HISTORY_FILE)
+    if chat_id not in history:
+        history[chat_id] = []
+    history[chat_id].append({"name": name, "text": text})
+    history[chat_id] = history[chat_id][-HISTORY_LIMIT:]
+    save_json(CHAT_HISTORY_FILE, history)
+
+def get_history(chat_id: str) -> list:
+    history = load_json(CHAT_HISTORY_FILE)
+    return history.get(chat_id, [])
+
 def get_weather():
     try:
         url = f"http://api.openweathermap.org/data/2.5/weather?q={CITY}&appid={WEATHER_API_KEY}&units=metric&lang=ru"
@@ -109,15 +123,18 @@ def get_news():
     except:
         return "📰 Новости: не удалось получить данные"
 
-def ask_gpt(question: str) -> str:
+def ask_gpt(question: str, chat_id: str) -> str:
     try:
         client = OpenAI(api_key=OPENAI_API_KEY)
+        history = get_history(chat_id)
+        history_text = "\n".join(f"{m['name']}: {m['text']}" for m in history)
+        messages = [
+            {"role": "system", "content": f"Ты — Пятница, дружелюбный бот для группового чата друзей. Версия 5. Отвечай коротко, по-русски, неформально.\n\nПоследние сообщения в чате:\n{history_text}"},
+            {"role": "user", "content": question}
+        ]
         response = client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "Ты — Пятница, дружелюбный бот для группового чата друзей. Версия 4. Отвечай коротко, по-русски, неформально. Ты не помнишь предыдущие сообщения в чате — только то что написали тебе прямо сейчас."},
-                {"role": "user", "content": question}
-            ],
+            messages=messages,
             max_tokens=500
         )
         return response.choices[0].message.content
@@ -174,13 +191,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_activity[chat_id] = now.isoformat()
     save_json(LAST_CHAT_ACTIVITY_FILE, chat_activity)
 
+    if msg.text:
+        add_to_history(chat_id, user_name, msg.text)
+
     if msg.photo or msg.video or msg.video_note:
         await msg.set_reaction([ReactionTypeEmoji(emoji=random.choice(REACTIONS))])
 
     if msg.text and f"@{BOT_USERNAME}" in msg.text:
         question = msg.text.replace(f"@{BOT_USERNAME}", "").strip()
         if question:
-            answer = ask_gpt(question)
+            answer = ask_gpt(question, chat_id)
             await msg.reply_text(answer)
 
 if __name__ == "__main__":
