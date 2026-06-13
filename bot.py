@@ -1,16 +1,20 @@
 import json
 import os
 import random
+import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 from telegram import Update, ReactionTypeEmoji
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
+import urllib.request
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
+WEATHER_API_KEY = os.environ.get("WEATHER_API_KEY")
 ALLOWED_CHAT_IDS = [-5102540817, -437147591]
 AWAY_THRESHOLD_HOURS = 3
 INACTIVE_HOURS = 3
 LAST_SEEN_FILE = "last_seen.json"
 LAST_CHAT_ACTIVITY_FILE = "last_chat_activity.json"
+CITY = "Saint Petersburg"
 
 GREETINGS = [
     "Привет, {name}! Тебя не было {time} 👋",
@@ -59,6 +63,56 @@ def format_duration(delta: timedelta) -> str:
         return f"{hours} ч"
     else:
         return f"{hours} ч {minutes} мин"
+
+def get_weather():
+    try:
+        url = f"http://api.openweathermap.org/data/2.5/weather?q={CITY}&appid={WEATHER_API_KEY}&units=metric&lang=ru"
+        with urllib.request.urlopen(url, timeout=10) as r:
+            data = json.loads(r.read())
+        desc = data["weather"][0]["description"].capitalize()
+        temp = round(data["main"]["temp"])
+        feels = round(data["main"]["feels_like"])
+        return f"🌤 Погода в Санкт-Петербурге: {desc}, {temp}°C (ощущается как {feels}°C)"
+    except:
+        return "🌤 Погода: не удалось получить данные"
+
+def get_currency():
+    try:
+        url = "https://www.cbr.ru/scripts/XML_daily.asp"
+        with urllib.request.urlopen(url, timeout=10) as r:
+            tree = ET.parse(r)
+        root = tree.getroot()
+        rates = {}
+        for valute in root.findall("Valute"):
+            char_code = valute.find("CharCode").text
+            value = valute.find("Value").text.replace(",", ".")
+            nominal = valute.find("Nominal").text
+            if char_code in ("USD", "EUR"):
+                rates[char_code] = round(float(value) / int(nominal), 2)
+        return f"💵 Курс ЦБ: USD — {rates.get('USD', '?')}₽ | EUR — {rates.get('EUR', '?')}₽"
+    except:
+        return "💵 Курс валют: не удалось получить данные"
+
+def get_news():
+    try:
+        url = "https://lenta.ru/rss/news"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=10) as r:
+            tree = ET.parse(r)
+        root = tree.getroot()
+        items = root.findall(".//item")[:3]
+        news = "\n".join(f"• {item.find('title').text}" for item in items)
+        return f"📰 Новости:\n{news}"
+    except:
+        return "📰 Новости: не удалось получить данные"
+
+async def morning_digest(context: ContextTypes.DEFAULT_TYPE):
+    weather = get_weather()
+    currency = get_currency()
+    news = get_news()
+    text = f"☀️ Доброе утро!\n\n{weather}\n\n{currency}\n\n{news}"
+    for chat_id in ALLOWED_CHAT_IDS:
+        await context.bot.send_message(chat_id=chat_id, text=text)
 
 async def check_inactive_chats(context: ContextTypes.DEFAULT_TYPE):
     now = datetime.utcnow()
@@ -109,5 +163,6 @@ if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, handle_message))
     app.job_queue.run_repeating(check_inactive_chats, interval=600, first=60)
+    app.job_queue.run_daily(morning_digest, time=datetime.strptime("06:00", "%H:%M").time())
     print("Бот запущен!")
     app.run_polling()
