@@ -2,7 +2,7 @@ import json
 import os
 import random
 from datetime import datetime, timedelta
-from telegram import Update
+from telegram import Update, ReactionTypeEmoji
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
@@ -18,7 +18,7 @@ GREETINGS = [
     "Привет-привет, {name}! Где был {time}? 😄",
 ]
 
-EMOJIS = ["🔥","❤️","👍","😂","😮","🎉","💯","👏","🤩","😎","🥳","💪"]
+REACTIONS = ["👍","❤","🔥","🎉","🤩","💯","👏","😁","🏆","⚡","🥰","😱","🤣","💔","😎"]
 
 def load_last_seen():
     if os.path.exists(LAST_SEEN_FILE):
@@ -60,7 +60,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(greeting)
     last_seen[user_id] = now.isoformat()
     save_last_seen(last_seen)
-    await update.message.reply_text(random.choice(EMOJIS))
+    await update.message.set_reaction([ReactionTypeEmoji(emoji=random.choice(REACTIONS))])
 
 if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
