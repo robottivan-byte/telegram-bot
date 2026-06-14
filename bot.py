@@ -4,7 +4,7 @@ import re
 import random
 import xml.etree.ElementTree as ET
 import urllib.request
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 from telegram import Update, ReactionTypeEmoji
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 from openai import OpenAI
@@ -57,6 +57,23 @@ CONDITIONS = {
     "heavy-rain": "Сильный дождь", "snow": "Снег", "light-snow": "Небольшой снег",
     "snowfall": "Снегопад", "hail": "Град", "thunderstorm": "Гроза",
     "fog": "Туман", "drizzle": "Морось"
+}
+
+CONDITION_EMOJI = {
+    "clear": "☀️",
+    "partly-cloudy": "🌤",
+    "cloudy": "⛅",
+    "overcast": "☁️",
+    "light-rain": "🌦",
+    "rain": "🌧",
+    "heavy-rain": "⛈",
+    "snow": "❄️",
+    "light-snow": "🌨",
+    "snowfall": "☃️",
+    "hail": "🌩",
+    "thunderstorm": "⛈",
+    "fog": "🌫",
+    "drizzle": "🌧",
 }
 
 def load_json(filename):
@@ -126,28 +143,36 @@ def get_weather_forecast():
     except Exception as e:
         return f"📅 Прогноз: не удалось получить данные ({e})"
 
-def get_weather_hourly():
+def get_weather_hourly(day_index=0, hours_from=None, hours_count=12):
     try:
         url = f"https://api.weather.yandex.ru/v2/forecast?lat={LAT}&lon={LON}&lang=ru_RU&limit=2&hours=true"
         req = urllib.request.Request(url, headers={"X-Yandex-API-Key": YANDEX_WEATHER_KEY})
         with urllib.request.urlopen(req, timeout=10) as r:
             data = json.loads(r.read())
+
         now_moscow = datetime.utcnow() + timedelta(hours=3)
-        current_hour = now_moscow.hour
+        if hours_from is None:
+            hours_from = now_moscow.hour
+
         today_hours = data["forecasts"][0].get("hours", [])
         tomorrow_hours = data["forecasts"][1].get("hours", [])
-        # берём только часы начиная с текущего
-        remaining_today = [h for h in today_hours if int(h["hour"]) >= current_hour]
-        all_hours = remaining_today + tomorrow_hours
+
+        if day_index == 0:
+            source = [h for h in today_hours if int(h["hour"]) >= hours_from] + tomorrow_hours
+            label = "Прогноз на сегодня"
+        else:
+            source = tomorrow_hours
+            label = "Прогноз на завтра"
+
         lines = []
-        for h in all_hours[:12]:
+        for h in source[:hours_count]:
             h_hour = int(h["hour"])
             temp = h["temp"]
-            feels = h["feels_like"]
-            desc = CONDITIONS.get(h["condition"], h["condition"])
-            lines.append(f"  {h_hour:02d}:00 — {desc}, {temp}°C (ощущается {feels}°C)")
+            emoji = CONDITION_EMOJI.get(h["condition"], "🌡")
+            lines.append(f"{h_hour:02d}:00 {emoji} {temp}°C")
+
         result = "\n".join(lines)
-        return f"🕐 Почасовой прогноз, Санкт-Петербург:\n\n{result}"
+        return f"🕐 {label}, Санкт-Петербург:\n\n{result}"
     except Exception as e:
         return f"🕐 Почасовой прогноз: не удалось получить данные ({e})"
 
@@ -248,12 +273,20 @@ def parse_poll(text: str):
     options = [o.strip() for o in options if o.strip()]
     return options if len(options) >= 2 else None
 
+# 06:00 UTC = 09:00 МСК
 async def morning_digest(context: ContextTypes.DEFAULT_TYPE):
     weather = get_weather()
-    forecast = get_weather_forecast()
+    hourly = get_weather_hourly(day_index=0, hours_from=9, hours_count=14)
     currency = get_currency()
     news = get_news()
-    text = f"☀️ Доброе утро!\n\n{weather}\n\n{forecast}\n\n{currency}\n\n{news}"
+    text = f"☀️ Доброе утро!\n\n{weather}\n\n{hourly}\n\n{currency}\n\n{news}"
+    for chat_id in ALLOWED_CHAT_IDS:
+        await context.bot.send_message(chat_id=chat_id, text=text)
+
+# 20:00 UTC = 23:00 МСК
+async def evening_forecast(context: ContextTypes.DEFAULT_TYPE):
+    forecast = get_weather_hourly(day_index=1, hours_from=0, hours_count=24)
+    text = f"🌙 Прогноз на завтра по часам:\n\n{forecast}"
     for chat_id in ALLOWED_CHAT_IDS:
         await context.bot.send_message(chat_id=chat_id, text=text)
 
@@ -387,6 +420,7 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, handle_message))
     app.job_queue.run_repeating(check_inactive_chats, interval=600, first=60)
     app.job_queue.run_repeating(check_reminders, interval=60, first=10)
-    app.job_queue.run_daily(morning_digest, time=datetime.strptime("06:00", "%H:%M").time())
+    app.job_queue.run_daily(morning_digest, time=time(6, 0))   # 09:00 МСК
+    app.job_queue.run_daily(evening_forecast, time=time(20, 0)) # 23:00 МСК
     print("Бот запущен!")
     app.run_polling()
