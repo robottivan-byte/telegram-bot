@@ -126,6 +126,31 @@ def get_weather_forecast():
     except Exception as e:
         return f"📅 Прогноз: не удалось получить данные ({e})"
 
+def get_weather_hourly():
+    try:
+        url = f"https://api.weather.yandex.ru/v2/forecast?lat={LAT}&lon={LON}&lang=ru_RU&limit=2&hours=true"
+        req = urllib.request.Request(url, headers={"X-Yandex-API-Key": YANDEX_WEATHER_KEY})
+        with urllib.request.urlopen(req, timeout=10) as r:
+            data = json.loads(r.read())
+        now_moscow = datetime.utcnow() + timedelta(hours=3)
+        current_hour = now_moscow.hour
+        today_hours = data["forecasts"][0].get("hours", [])
+        tomorrow_hours = data["forecasts"][1].get("hours", [])
+        # берём только часы начиная с текущего
+        remaining_today = [h for h in today_hours if int(h["hour"]) >= current_hour]
+        all_hours = remaining_today + tomorrow_hours
+        lines = []
+        for h in all_hours[:12]:
+            h_hour = int(h["hour"])
+            temp = h["temp"]
+            feels = h["feels_like"]
+            desc = CONDITIONS.get(h["condition"], h["condition"])
+            lines.append(f"  {h_hour:02d}:00 — {desc}, {temp}°C (ощущается {feels}°C)")
+        result = "\n".join(lines)
+        return f"🕐 Почасовой прогноз, Санкт-Петербург:\n\n{result}"
+    except Exception as e:
+        return f"🕐 Почасовой прогноз: не удалось получить данные ({e})"
+
 def get_currency():
     try:
         url = "https://www.cbr.ru/scripts/XML_daily.asp"
@@ -232,11 +257,6 @@ async def morning_digest(context: ContextTypes.DEFAULT_TYPE):
     for chat_id in ALLOWED_CHAT_IDS:
         await context.bot.send_message(chat_id=chat_id, text=text)
 
-async def forecast_test(context: ContextTypes.DEFAULT_TYPE):
-    forecast = get_weather_forecast()
-    for chat_id in ALLOWED_CHAT_IDS:
-        await context.bot.send_message(chat_id=chat_id, text=f"🧪 Тест прогноза:\n{forecast}")
-
 async def check_inactive_chats(context: ContextTypes.DEFAULT_TYPE):
     now = datetime.utcnow()
     moscow_hour = (now.hour + 3) % 24
@@ -317,6 +337,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif re.search(r'^прогноз$', question, re.IGNORECASE):
             await msg.reply_text(get_weather_forecast())
 
+        elif re.search(r'^часы$', question, re.IGNORECASE):
+            await msg.reply_text(get_weather_hourly())
+
         elif re.search(r'^курс$', question, re.IGNORECASE):
             await msg.reply_text(get_currency())
 
@@ -365,6 +388,5 @@ if __name__ == "__main__":
     app.job_queue.run_repeating(check_inactive_chats, interval=600, first=60)
     app.job_queue.run_repeating(check_reminders, interval=60, first=10)
     app.job_queue.run_daily(morning_digest, time=datetime.strptime("06:00", "%H:%M").time())
-    app.job_queue.run_once(forecast_test, when=300)
-    print("Бот запущен! Тест прогноза придёт через 5 минут.")
+    print("Бот запущен!")
     app.run_polling()
