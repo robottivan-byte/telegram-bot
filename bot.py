@@ -10,7 +10,7 @@ from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTyp
 from openai import OpenAI
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
-WEATHER_API_KEY = os.environ.get("WEATHER_API_KEY")
+YANDEX_WEATHER_KEY = os.environ.get("YANDEX_WEATHER_KEY")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 ALLOWED_CHAT_IDS = [-5102540817, -437147591]
 BOT_USERNAME = "Fuckbook1Bot"
@@ -21,7 +21,8 @@ LAST_SEEN_FILE = "last_seen.json"
 LAST_CHAT_ACTIVITY_FILE = "last_chat_activity.json"
 CHAT_HISTORY_FILE = "chat_history.json"
 REMINDERS_FILE = "reminders.json"
-CITY = "Saint Petersburg"
+LAT = "59.9311"
+LON = "30.3609"
 REMIND_BEFORE_HOURS = [4, 3, 2, 1]
 
 GREETINGS = [
@@ -136,15 +137,25 @@ def parse_poll(text: str):
 
 def get_weather():
     try:
-        url = f"http://api.openweathermap.org/data/2.5/weather?q={CITY}&appid={WEATHER_API_KEY}&units=metric&lang=ru"
-        with urllib.request.urlopen(url, timeout=10) as r:
+        url = f"https://api.weather.yandex.ru/v2/forecast?lat={LAT}&lon={LON}&lang=ru_RU&limit=1"
+        req = urllib.request.Request(url, headers={"X-Yandex-API-Key": YANDEX_WEATHER_KEY})
+        with urllib.request.urlopen(req, timeout=10) as r:
             data = json.loads(r.read())
-        desc = data["weather"][0]["description"].capitalize()
-        temp = round(data["main"]["temp"])
-        feels = round(data["main"]["feels_like"])
+        fact = data["fact"]
+        temp = fact["temp"]
+        feels = fact["feels_like"]
+        condition = fact["condition"]
+        conditions = {
+            "clear": "Ясно", "partly-cloudy": "Малооблачно", "cloudy": "Облачно",
+            "overcast": "Пасмурно", "light-rain": "Небольшой дождь", "rain": "Дождь",
+            "heavy-rain": "Сильный дождь", "snow": "Снег", "light-snow": "Небольшой снег",
+            "snowfall": "Снегопад", "hail": "Град", "thunderstorm": "Гроза",
+            "fog": "Туман", "drizzle": "Морось"
+        }
+        desc = conditions.get(condition, condition)
         return f"🌤 Погода в Санкт-Петербурге: {desc}, {temp}°C (ощущается как {feels}°C)"
-    except:
-        return "🌤 Погода: не удалось получить данные"
+    except Exception as e:
+        return f"🌤 Погода: не удалось получить данные ({e})"
 
 def get_currency():
     try:
@@ -184,7 +195,7 @@ def ask_gpt(question: str, chat_id: str) -> str:
         now_moscow = datetime.utcnow() + timedelta(hours=3)
         current_time = now_moscow.strftime("%H:%M")
         messages = [
-            {"role": "system", "content": f"Ты — Пятница, дружелюбный бот для группового чата друзей. Версия 5. Отвечай коротко, по-русски, неформально. Сейчас московское время: {current_time}.\n\nПоследние сообщения в чате:\n{history_text}"},
+            {"role": "system", "content": f"Ты — Пятница, дружелюбный бот для группового чата друзей. Версия 6. Отвечай коротко, по-русски, неформально. Сейчас московское время: {current_time}.\n\nПоследние сообщения в чате:\n{history_text}"},
             {"role": "user", "content": question}
         ]
         response = client.chat.completions.create(
