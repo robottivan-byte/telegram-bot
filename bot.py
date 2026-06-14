@@ -236,6 +236,23 @@ def get_news():
     except:
         return "📰 Новости: не удалось получить данные"
 
+def get_commands_text():
+    return (
+        "📋 Доступные команды:\n\n"
+        "🌤 погода — погода сейчас\n"
+        "📅 прогноз — прогноз на завтра\n"
+        "🕐 часы — почасовой прогноз\n"
+        "💵 курс — USD / EUR / CNY к рублю\n"
+        "₿ биткоин — цена Bitcoin\n"
+        "📊 ммвб — индекс Мосбиржи\n"
+        "📊 nasdaq — индекс NASDAQ\n"
+        "📰 новости — топ новости\n"
+        "🗳 голосование X или Y или Z — создать опрос\n"
+        "🔔 напомнить \"19:30\" текст \"баня\" — напоминание\n"
+        "💬 любой вопрос — отвечу через AI\n\n"
+        "Все команды пишутся через @Fuckbook1Bot"
+    )
+
 def ask_gpt(question: str, chat_id: str) -> str:
     try:
         client = OpenAI(api_key=OPENAI_API_KEY)
@@ -243,7 +260,7 @@ def ask_gpt(question: str, chat_id: str) -> str:
         history_text = "\n".join(f"{m['name']}: {m['text']}" for m in history)
         now_moscow = datetime.utcnow() + timedelta(hours=3)
         messages = [
-            {"role": "system", "content": f"Ты — Пятница, дружелюбный бот для группового чата друзей. Версия 6. Отвечай коротко, по-русски, неформально. Сейчас московское время: {now_moscow.strftime('%H:%M')}.\n\nПоследние сообщения в чате:\n{history_text}"},
+            {"role": "system", "content": f"Ты — Пятница, дружелюбный бот для группового чата друзей. Вариант 7. Отвечай коротко, по-русски, неформально. Сейчас московское время: {now_moscow.strftime('%H:%M')}.\n\nПоследние сообщения в чате:\n{history_text}"},
             {"role": "user", "content": question}
         ]
         response = client.chat.completions.create(model="gpt-4o-mini", messages=messages, max_tokens=500)
@@ -298,7 +315,6 @@ def parse_poll(text: str):
     options = [o.strip() for o in options if o.strip()]
     return options if len(options) >= 2 else None
 
-# 06:01 UTC = 09:01 МСК
 async def morning_digest(context: ContextTypes.DEFAULT_TYPE):
     weather = get_weather()
     hourly = get_weather_hourly(day_index=0, hours_from=9, hours_count=14)
@@ -307,8 +323,9 @@ async def morning_digest(context: ContextTypes.DEFAULT_TYPE):
     moex = get_moex()
     nasdaq = get_nasdaq()
     news = get_news()
+    now_moscow = datetime.utcnow() + timedelta(hours=3)
     text = (
-        f"☀️ Доброе утро! Сводка на {datetime.utcnow().strftime('%d.%m.%Y')}:\n\n"
+        f"☀️ Доброе утро! Сводка на {now_moscow.strftime('%d.%m.%Y')}:\n\n"
         f"{weather}\n\n"
         f"{hourly}\n\n"
         f"{currency}\n\n"
@@ -320,7 +337,6 @@ async def morning_digest(context: ContextTypes.DEFAULT_TYPE):
     for chat_id in ALLOWED_CHAT_IDS:
         await context.bot.send_message(chat_id=chat_id, text=text)
 
-# 20:00 UTC = 23:00 МСК
 async def evening_forecast(context: ContextTypes.DEFAULT_TYPE):
     forecast = get_weather_hourly(day_index=1, hours_from=0, hours_count=24)
     for chat_id in ALLOWED_CHAT_IDS:
@@ -400,7 +416,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not question:
             return
 
-        if re.search(r'^погода$', question, re.IGNORECASE):
+        if re.search(r'^команды$', question, re.IGNORECASE):
+            await msg.reply_text(get_commands_text())
+
+        elif re.search(r'^погода$', question, re.IGNORECASE):
             await msg.reply_text(get_weather())
 
         elif re.search(r'^прогноз$', question, re.IGNORECASE):
@@ -467,5 +486,5 @@ if __name__ == "__main__":
     app.job_queue.run_repeating(check_reminders, interval=60, first=10)
     app.job_queue.run_daily(morning_digest, time=time(6, 1))    # 09:01 МСК
     app.job_queue.run_daily(evening_forecast, time=time(20, 0)) # 23:00 МСК
-    print("Бот запущен!")
+    print("Бот Пятница Вариант 7 запущен!")
     app.run_polling()
