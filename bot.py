@@ -7,7 +7,6 @@ import urllib.request
 from datetime import datetime, timedelta
 from telegram import Update, ReactionTypeEmoji
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
-
 from openai import OpenAI
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
@@ -52,6 +51,14 @@ CONTENT = [
     "💬 Ау! Кто что делает? Расскажите как дела 👋",
 ]
 
+CONDITIONS = {
+    "clear": "Ясно", "partly-cloudy": "Малооблачно", "cloudy": "Облачно",
+    "overcast": "Пасмурно", "light-rain": "Небольшой дождь", "rain": "Дождь",
+    "heavy-rain": "Сильный дождь", "snow": "Снег", "light-snow": "Небольшой снег",
+    "snowfall": "Снегопад", "hail": "Град", "thunderstorm": "Гроза",
+    "fog": "Туман", "drizzle": "Морось"
+}
+
 def load_json(filename):
     if os.path.exists(filename):
         with open(filename, "r", encoding="utf-8") as f:
@@ -94,18 +101,30 @@ def get_weather():
         fact = data["fact"]
         temp = fact["temp"]
         feels = fact["feels_like"]
-        condition = fact["condition"]
-        conditions = {
-            "clear": "Ясно", "partly-cloudy": "Малооблачно", "cloudy": "Облачно",
-            "overcast": "Пасмурно", "light-rain": "Небольшой дождь", "rain": "Дождь",
-            "heavy-rain": "Сильный дождь", "snow": "Снег", "light-snow": "Небольшой снег",
-            "snowfall": "Снегопад", "hail": "Град", "thunderstorm": "Гроза",
-            "fog": "Туман", "drizzle": "Морось"
-        }
-        desc = conditions.get(condition, condition)
+        desc = CONDITIONS.get(fact["condition"], fact["condition"])
         return f"🌤 Погода в Санкт-Петербурге: {desc}, {temp}°C (ощущается как {feels}°C)"
     except Exception as e:
         return f"🌤 Погода: не удалось получить данные ({e})"
+
+def get_weather_forecast():
+    try:
+        url = f"https://api.weather.yandex.ru/v2/forecast?lat={LAT}&lon={LON}&lang=ru_RU&limit=2"
+        req = urllib.request.Request(url, headers={"X-Yandex-API-Key": YANDEX_WEATHER_KEY})
+        with urllib.request.urlopen(req, timeout=10) as r:
+            data = json.loads(r.read())
+        tomorrow = data["forecasts"][1]
+        day = tomorrow["parts"]["day"]
+        night = tomorrow["parts"]["night"]
+        date_str = tomorrow["date"]
+        day_desc = CONDITIONS.get(day["condition"], day["condition"])
+        night_desc = CONDITIONS.get(night["condition"], night["condition"])
+        return (
+            f"📅 Прогноз на завтра ({date_str}), Санкт-Петербург:\n\n"
+            f"☀️ День: {day_desc}, {day['temp_avg']}°C (ощущается как {day['feels_like']}°C)\n"
+            f"🌙 Ночь: {night_desc}, {night['temp_avg']}°C (ощущается как {night['feels_like']}°C)"
+        )
+    except Exception as e:
+        return f"📅 Прогноз: не удалось получить данные ({e})"
 
 def get_currency():
     try:
@@ -161,16 +180,13 @@ def parse_reminder(text: str, chat_id: str):
     match = re.search(r'напомнить\s+"(\d{1,2}:\d{2})"\s+текст\s+"([^"]+)"', text, re.IGNORECASE)
     if not match:
         return None
-
     time_str = match.group(1)
     reminder_text = match.group(2).strip()
-
     hour, minute = map(int, time_str.split(":"))
     now_moscow = datetime.utcnow() + timedelta(hours=3)
     event_time = now_moscow.replace(hour=hour, minute=minute, second=0, microsecond=0)
     if event_time <= now_moscow:
         event_time += timedelta(days=1)
-
     notifications = []
     for minutes_before in [120, 60, 30, 0]:
         notify_at = event_time - timedelta(minutes=minutes_before)
@@ -182,10 +198,8 @@ def parse_reminder(text: str, chat_id: str):
                 "notify_at": notify_at.isoformat(),
                 "notified": False
             })
-
     if not notifications:
         return None
-
     return {
         "chat_id": chat_id,
         "text": reminder_text,
@@ -211,16 +225,17 @@ def parse_poll(text: str):
 
 async def morning_digest(context: ContextTypes.DEFAULT_TYPE):
     weather = get_weather()
+    forecast = get_weather_forecast()
     currency = get_currency()
     news = get_news()
-    text = f"☀️ Доброе утро!\n\n{weather}\n\n{currency}\n\n{news}"
+    text = f"☀️ Доброе утро!\n\n{weather}\n\n{forecast}\n\n{currency}\n\n{news}"
     for chat_id in ALLOWED_CHAT_IDS:
         await context.bot.send_message(chat_id=chat_id, text=text)
 
-async def weather_test(context: ContextTypes.DEFAULT_TYPE):
-    weather = get_weather()
+async def forecast_test(context: ContextTypes.DEFAULT_TYPE):
+    forecast = get_weather_forecast()
     for chat_id in ALLOWED_CHAT_IDS:
-        await context.bot.send_message(chat_id=chat_id, text=f"🧪 Тест погоды:\n{weather}")
+        await context.bot.send_message(chat_id=chat_id, text=f"🧪 Тест прогноза:\n{forecast}")
 
 async def check_inactive_chats(context: ContextTypes.DEFAULT_TYPE):
     now = datetime.utcnow()
@@ -247,10 +262,9 @@ async def check_reminders(context: ContextTypes.DEFAULT_TYPE):
                 if not notif["notified"]:
                     notify_at = datetime.fromisoformat(notif["notify_at"])
                     if now_moscow >= notify_at:
-                        label = notif["label"]
                         await context.bot.send_message(
                             chat_id=int(chat_id),
-                            text=f"🔔 Напоминание ({label}):\n{reminder['text']} в {reminder['event_time']}"
+                            text=f"🔔 Напоминание ({notif['label']}):\n{reminder['text']} в {reminder['event_time']}"
                         )
                         notif["notified"] = True
                         changed = True
@@ -300,6 +314,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if re.search(r'^погода$', question, re.IGNORECASE):
             await msg.reply_text(get_weather())
 
+        elif re.search(r'^прогноз$', question, re.IGNORECASE):
+            await msg.reply_text(get_weather_forecast())
+
         elif re.search(r'^курс$', question, re.IGNORECASE):
             await msg.reply_text(get_currency())
 
@@ -348,7 +365,6 @@ if __name__ == "__main__":
     app.job_queue.run_repeating(check_inactive_chats, interval=600, first=60)
     app.job_queue.run_repeating(check_reminders, interval=60, first=10)
     app.job_queue.run_daily(morning_digest, time=datetime.strptime("06:00", "%H:%M").time())
-    # Тест погоды — придёт через 5 минут после запуска
-    app.job_queue.run_once(weather_test, when=300)
-    print("Бот запущен! Тест погоды придёт через 5 минут.")
+    app.job_queue.run_once(forecast_test, when=300)
+    print("Бот запущен! Тест прогноза придёт через 5 минут.")
     app.run_polling()
