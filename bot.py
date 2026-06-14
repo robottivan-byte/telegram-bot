@@ -7,6 +7,7 @@ import urllib.request
 from datetime import datetime, timedelta
 from telegram import Update, ReactionTypeEmoji
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
+
 from openai import OpenAI
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
@@ -23,7 +24,6 @@ CHAT_HISTORY_FILE = "chat_history.json"
 REMINDERS_FILE = "reminders.json"
 LAT = "59.9311"
 LON = "30.3609"
-REMIND_BEFORE_HOURS = [4, 3, 2, 1]
 
 GREETINGS = [
     "Привет, {name}! Тебя не было {time} 👋",
@@ -84,56 +84,6 @@ def add_to_history(chat_id: str, name: str, text: str):
 def get_history(chat_id: str) -> list:
     history = load_json(CHAT_HISTORY_FILE)
     return history.get(chat_id, [])
-
-def parse_reminder(text: str, chat_id: str):
-    match = re.search(r'в\s+(\d{1,2}):(\d{2})', text)
-    if not match:
-        match = re.search(r'(\d{1,2}):(\d{2})', text)
-    if not match:
-        return None
-    hour = int(match.group(1))
-    minute = int(match.group(2))
-    now_moscow = datetime.utcnow() + timedelta(hours=3)
-    event_time = now_moscow.replace(hour=hour, minute=minute, second=0, microsecond=0)
-    if event_time <= now_moscow:
-        event_time += timedelta(days=1)
-    reminder_text = re.sub(r'@\w+', '', text)
-    reminder_text = re.sub(r'напомни\s*', '', reminder_text, flags=re.IGNORECASE)
-    reminder_text = re.sub(r'поставь напоминание\s*', '', reminder_text, flags=re.IGNORECASE)
-    reminder_text = re.sub(r'о том что\s*', '', reminder_text, flags=re.IGNORECASE)
-    reminder_text = re.sub(r'что\s*', '', reminder_text, flags=re.IGNORECASE)
-    reminder_text = re.sub(r'в\s+\d{1,2}:\d{2}', '', reminder_text).strip()
-    notifications = []
-    for hours_before in REMIND_BEFORE_HOURS:
-        notify_at = event_time - timedelta(hours=hours_before)
-        if notify_at > now_moscow:
-            notifications.append({
-                "hours_before": hours_before,
-                "notify_at": notify_at.isoformat(),
-                "notified": False
-            })
-    return {
-        "chat_id": chat_id,
-        "text": reminder_text,
-        "event_time": event_time.strftime("%H:%M"),
-        "event_dt": event_time.isoformat(),
-        "notifications": notifications
-    }
-
-def save_reminder(reminder: dict):
-    reminders = load_json(REMINDERS_FILE)
-    chat_id = reminder["chat_id"]
-    if chat_id not in reminders:
-        reminders[chat_id] = []
-    reminders[chat_id].append(reminder)
-    save_json(REMINDERS_FILE, reminders)
-
-def parse_poll(text: str):
-    text = re.sub(r'@\w+', '', text)
-    text = re.sub(r'голосование\s*', '', text, flags=re.IGNORECASE).strip()
-    options = re.split(r'\s+или\s+', text, flags=re.IGNORECASE)
-    options = [o.strip() for o in options if o.strip()]
-    return options if len(options) >= 2 else None
 
 def get_weather():
     try:
@@ -207,6 +157,58 @@ def ask_gpt(question: str, chat_id: str) -> str:
     except Exception as e:
         return f"Ошибка: {e}"
 
+def parse_reminder(text: str, chat_id: str):
+    match = re.search(r'напомнить\s+"(\d{1,2}:\d{2})"\s+текст\s+"([^"]+)"', text, re.IGNORECASE)
+    if not match:
+        return None
+
+    time_str = match.group(1)
+    reminder_text = match.group(2).strip()
+
+    hour, minute = map(int, time_str.split(":"))
+    now_moscow = datetime.utcnow() + timedelta(hours=3)
+    event_time = now_moscow.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if event_time <= now_moscow:
+        event_time += timedelta(days=1)
+
+    notifications = []
+    for minutes_before in [120, 60, 30, 0]:
+        notify_at = event_time - timedelta(minutes=minutes_before)
+        if notify_at > now_moscow:
+            label = f"за {minutes_before} мин" if minutes_before > 0 else "в момент события"
+            notifications.append({
+                "minutes_before": minutes_before,
+                "label": label,
+                "notify_at": notify_at.isoformat(),
+                "notified": False
+            })
+
+    if not notifications:
+        return None
+
+    return {
+        "chat_id": chat_id,
+        "text": reminder_text,
+        "event_time": event_time.strftime("%H:%M"),
+        "event_dt": event_time.isoformat(),
+        "notifications": notifications
+    }
+
+def save_reminder(reminder: dict):
+    reminders = load_json(REMINDERS_FILE)
+    chat_id = reminder["chat_id"]
+    if chat_id not in reminders:
+        reminders[chat_id] = []
+    reminders[chat_id].append(reminder)
+    save_json(REMINDERS_FILE, reminders)
+
+def parse_poll(text: str):
+    text = re.sub(r'@\w+', '', text)
+    text = re.sub(r'голосование\s*', '', text, flags=re.IGNORECASE).strip()
+    options = re.split(r'\s+или\s+', text, flags=re.IGNORECASE)
+    options = [o.strip() for o in options if o.strip()]
+    return options if len(options) >= 2 else None
+
 async def morning_digest(context: ContextTypes.DEFAULT_TYPE):
     weather = get_weather()
     currency = get_currency()
@@ -214,6 +216,11 @@ async def morning_digest(context: ContextTypes.DEFAULT_TYPE):
     text = f"☀️ Доброе утро!\n\n{weather}\n\n{currency}\n\n{news}"
     for chat_id in ALLOWED_CHAT_IDS:
         await context.bot.send_message(chat_id=chat_id, text=text)
+
+async def weather_test(context: ContextTypes.DEFAULT_TYPE):
+    weather = get_weather()
+    for chat_id in ALLOWED_CHAT_IDS:
+        await context.bot.send_message(chat_id=chat_id, text=f"🧪 Тест погоды:\n{weather}")
 
 async def check_inactive_chats(context: ContextTypes.DEFAULT_TYPE):
     now = datetime.utcnow()
@@ -240,10 +247,10 @@ async def check_reminders(context: ContextTypes.DEFAULT_TYPE):
                 if not notif["notified"]:
                     notify_at = datetime.fromisoformat(notif["notify_at"])
                     if now_moscow >= notify_at:
-                        hours_before = notif["hours_before"]
+                        label = notif["label"]
                         await context.bot.send_message(
                             chat_id=int(chat_id),
-                            text=f"🔔 Напоминание: {reminder['text']} через {hours_before} ч (в {reminder['event_time']})!"
+                            text=f"🔔 Напоминание ({label}):\n{reminder['text']} в {reminder['event_time']}"
                         )
                         notif["notified"] = True
                         changed = True
@@ -287,32 +294,53 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if msg.text and f"@{BOT_USERNAME}" in msg.text:
         question = msg.text.replace(f"@{BOT_USERNAME}", "").strip()
-        if question:
-            if re.search(r'напомни|поставь напоминание', question, re.IGNORECASE) and re.search(r'\d{1,2}:\d{2}', question):
-                reminder = parse_reminder(question, chat_id)
-                if reminder:
-                    save_reminder(reminder)
-                    notif_times = ", ".join([
-                        f"в {datetime.fromisoformat(n['notify_at']).strftime('%H:%M')} (за {n['hours_before']} ч)"
-                        for n in reminder["notifications"]
-                    ])
-                    await msg.reply_text(f"✅ Запомнил! {reminder['text']} в {reminder['event_time']}.\nНапомню: {notif_times}")
-                else:
-                    await msg.reply_text("Не понял время. Напиши например: @Fuckbook1Bot напомни баня в 19:30")
-            elif re.search(r'голосование', question, re.IGNORECASE):
-                options = parse_poll(question)
-                if options and len(options) >= 2:
-                    await context.bot.send_poll(
-                        chat_id=update.effective_chat.id,
-                        question="Голосуем! 🗳",
-                        options=options[:10],
-                        is_anonymous=False
-                    )
-                else:
-                    await msg.reply_text("Напиши так: @Fuckbook1Bot голосование баня или кино или ресторан")
+        if not question:
+            return
+
+        if re.search(r'^погода$', question, re.IGNORECASE):
+            await msg.reply_text(get_weather())
+
+        elif re.search(r'^курс$', question, re.IGNORECASE):
+            await msg.reply_text(get_currency())
+
+        elif re.search(r'^новости$', question, re.IGNORECASE):
+            await msg.reply_text(get_news())
+
+        elif re.search(r'напомнить\s+"', question, re.IGNORECASE):
+            reminder = parse_reminder(question, chat_id)
+            if reminder:
+                save_reminder(reminder)
+                notif_times = "\n".join([
+                    f"  • {datetime.fromisoformat(n['notify_at']).strftime('%H:%M')} — {n['label']}"
+                    for n in reminder["notifications"]
+                ])
+                await msg.reply_text(
+                    f"✅ Напоминание создано!\n"
+                    f"📝 {reminder['text']}\n"
+                    f"🕐 Событие в {reminder['event_time']}\n"
+                    f"🔔 Уведомлю:\n{notif_times}"
+                )
             else:
-                answer = ask_gpt(question, chat_id)
-                await msg.reply_text(answer)
+                await msg.reply_text(
+                    '❌ Не понял формат или время уже прошло.\n\n'
+                    'Используй:\n@Fuckbook1Bot напомнить "19:30" текст "баня"'
+                )
+
+        elif re.search(r'голосование', question, re.IGNORECASE):
+            options = parse_poll(question)
+            if options and len(options) >= 2:
+                await context.bot.send_poll(
+                    chat_id=update.effective_chat.id,
+                    question="Голосуем! 🗳",
+                    options=options[:10],
+                    is_anonymous=False
+                )
+            else:
+                await msg.reply_text("Напиши так: @Fuckbook1Bot голосование баня или кино или ресторан")
+
+        else:
+            answer = ask_gpt(question, chat_id)
+            await msg.reply_text(answer)
 
 if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
@@ -320,5 +348,7 @@ if __name__ == "__main__":
     app.job_queue.run_repeating(check_inactive_chats, interval=600, first=60)
     app.job_queue.run_repeating(check_reminders, interval=60, first=10)
     app.job_queue.run_daily(morning_digest, time=datetime.strptime("06:00", "%H:%M").time())
-    print("Бот запущен!")
+    # Тест погоды — придёт через 5 минут после запуска
+    app.job_queue.run_once(weather_test, when=300)
+    print("Бот запущен! Тест погоды придёт через 5 минут.")
     app.run_polling()
