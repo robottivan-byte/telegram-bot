@@ -22,6 +22,7 @@ LAST_CHAT_ACTIVITY_FILE = "last_chat_activity.json"
 CHAT_HISTORY_FILE = "chat_history.json"
 REMINDERS_FILE = "reminders.json"
 CITY = "Saint Petersburg"
+REMIND_BEFORE_HOURS = [4, 3, 2, 1]
 
 GREETINGS = [
     "Привет, {name}! Тебя не было {time} 👋",
@@ -86,6 +87,8 @@ def get_history(chat_id: str) -> list:
 def parse_reminder(text: str, chat_id: str):
     match = re.search(r'в\s+(\d{1,2}):(\d{2})', text)
     if not match:
+        match = re.search(r'(\d{1,2}):(\d{2})', text)
+    if not match:
         return None
     hour = int(match.group(1))
     minute = int(match.group(2))
@@ -93,16 +96,27 @@ def parse_reminder(text: str, chat_id: str):
     event_time = now_moscow.replace(hour=hour, minute=minute, second=0, microsecond=0)
     if event_time <= now_moscow:
         event_time += timedelta(days=1)
-    notify_at = event_time - timedelta(hours=2)
     reminder_text = re.sub(r'@\w+', '', text)
     reminder_text = re.sub(r'напомни\s*', '', reminder_text, flags=re.IGNORECASE)
+    reminder_text = re.sub(r'поставь напоминание\s*', '', reminder_text, flags=re.IGNORECASE)
+    reminder_text = re.sub(r'о том что\s*', '', reminder_text, flags=re.IGNORECASE)
+    reminder_text = re.sub(r'что\s*', '', reminder_text, flags=re.IGNORECASE)
     reminder_text = re.sub(r'в\s+\d{1,2}:\d{2}', '', reminder_text).strip()
+    notifications = []
+    for hours_before in REMIND_BEFORE_HOURS:
+        notify_at = event_time - timedelta(hours=hours_before)
+        if notify_at > now_moscow:
+            notifications.append({
+                "hours_before": hours_before,
+                "notify_at": notify_at.isoformat(),
+                "notified": False
+            })
     return {
         "chat_id": chat_id,
         "text": reminder_text,
         "event_time": event_time.strftime("%H:%M"),
-        "notify_at": notify_at.isoformat(),
-        "notified": False
+        "event_dt": event_time.isoformat(),
+        "notifications": notifications
     }
 
 def save_reminder(reminder: dict):
@@ -112,6 +126,13 @@ def save_reminder(reminder: dict):
         reminders[chat_id] = []
     reminders[chat_id].append(reminder)
     save_json(REMINDERS_FILE, reminders)
+
+def parse_poll(text: str):
+    text = re.sub(r'@\w+', '', text)
+    text = re.sub(r'голосование\s*', '', text, flags=re.IGNORECASE).strip()
+    options = re.split(r'\s+или\s+', text, flags=re.IGNORECASE)
+    options = [o.strip() for o in options if o.strip()]
+    return options if len(options) >= 2 else None
 
 def get_weather():
     try:
@@ -160,8 +181,10 @@ def ask_gpt(question: str, chat_id: str) -> str:
         client = OpenAI(api_key=OPENAI_API_KEY)
         history = get_history(chat_id)
         history_text = "\n".join(f"{m['name']}: {m['text']}" for m in history)
+        now_moscow = datetime.utcnow() + timedelta(hours=3)
+        current_time = now_moscow.strftime("%H:%M")
         messages = [
-            {"role": "system", "content": f"Ты — Пятница, дружелюбный бот для группового чата друзей. Версия 5. Отвечай коротко, по-русски, неформально.\n\nПоследние сообщения в чате:\n{history_text}"},
+            {"role": "system", "content": f"Ты — Пятница, дружелюбный бот для группового чата друзей. Версия 5. Отвечай коротко, по-русски, неформально. Сейчас московское время: {current_time}.\n\nПоследние сообщения в чате:\n{history_text}"},
             {"role": "user", "content": question}
         ]
         response = client.chat.completions.create(
@@ -202,15 +225,17 @@ async def check_reminders(context: ContextTypes.DEFAULT_TYPE):
     changed = False
     for chat_id, chat_reminders in reminders.items():
         for reminder in chat_reminders:
-            if not reminder["notified"]:
-                notify_at = datetime.fromisoformat(reminder["notify_at"])
-                if now_moscow >= notify_at:
-                    await context.bot.send_message(
-                        chat_id=int(chat_id),
-                        text=f"🔔 Напоминание: {reminder['text']} через 2 часа (в {reminder['event_time']})!"
-                    )
-                    reminder["notified"] = True
-                    changed = True
+            for notif in reminder.get("notifications", []):
+                if not notif["notified"]:
+                    notify_at = datetime.fromisoformat(notif["notify_at"])
+                    if now_moscow >= notify_at:
+                        hours_before = notif["hours_before"]
+                        await context.bot.send_message(
+                            chat_id=int(chat_id),
+                            text=f"🔔 Напоминание: {reminder['text']} через {hours_before} ч (в {reminder['event_time']})!"
+                        )
+                        notif["notified"] = True
+                        changed = True
     if changed:
         save_json(REMINDERS_FILE, reminders)
 
@@ -252,11 +277,28 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if msg.text and f"@{BOT_USERNAME}" in msg.text:
         question = msg.text.replace(f"@{BOT_USERNAME}", "").strip()
         if question:
-            if re.search(r'напомни', question, re.IGNORECASE) and re.search(r'в\s+\d{1,2}:\d{2}', question):
+            if re.search(r'напомни|поставь напоминание', question, re.IGNORECASE) and re.search(r'\d{1,2}:\d{2}', question):
                 reminder = parse_reminder(question, chat_id)
                 if reminder:
                     save_reminder(reminder)
-                    await msg.reply_text(f"✅ Запомнил! Напомню про {reminder['text']} в {reminder['event_time']} (за 2 часа — в {datetime.fromisoformat(reminder['notify_at']).strftime('%H:%M')})")
+                    notif_times = ", ".join([
+                        f"в {datetime.fromisoformat(n['notify_at']).strftime('%H:%M')} (за {n['hours_before']} ч)"
+                        for n in reminder["notifications"]
+                    ])
+                    await msg.reply_text(f"✅ Запомнил! {reminder['text']} в {reminder['event_time']}.\nНапомню: {notif_times}")
+                else:
+                    await msg.reply_text("Не понял время. Напиши например: @Fuckbook1Bot напомни баня в 19:30")
+            elif re.search(r'голосование', question, re.IGNORECASE):
+                options = parse_poll(question)
+                if options and len(options) >= 2:
+                    await context.bot.send_poll(
+                        chat_id=update.effective_chat.id,
+                        question="Голосуем! 🗳",
+                        options=options[:10],
+                        is_anonymous=False
+                    )
+                else:
+                    await msg.reply_text("Напиши так: @Fuckbook1Bot голосование баня или кино или ресторан")
             else:
                 answer = ask_gpt(question, chat_id)
                 await msg.reply_text(answer)
