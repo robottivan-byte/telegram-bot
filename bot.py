@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import random
 import xml.etree.ElementTree as ET
 import urllib.request
@@ -19,6 +20,7 @@ HISTORY_LIMIT = 50
 LAST_SEEN_FILE = "last_seen.json"
 LAST_CHAT_ACTIVITY_FILE = "last_chat_activity.json"
 CHAT_HISTORY_FILE = "chat_history.json"
+REMINDERS_FILE = "reminders.json"
 CITY = "Saint Petersburg"
 
 GREETINGS = [
@@ -80,6 +82,36 @@ def add_to_history(chat_id: str, name: str, text: str):
 def get_history(chat_id: str) -> list:
     history = load_json(CHAT_HISTORY_FILE)
     return history.get(chat_id, [])
+
+def parse_reminder(text: str, chat_id: str):
+    match = re.search(r'в\s+(\d{1,2}):(\d{2})', text)
+    if not match:
+        return None
+    hour = int(match.group(1))
+    minute = int(match.group(2))
+    now_moscow = datetime.utcnow() + timedelta(hours=3)
+    event_time = now_moscow.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if event_time <= now_moscow:
+        event_time += timedelta(days=1)
+    notify_at = event_time - timedelta(hours=2)
+    reminder_text = re.sub(r'@\w+', '', text)
+    reminder_text = re.sub(r'напомни\s*', '', reminder_text, flags=re.IGNORECASE)
+    reminder_text = re.sub(r'в\s+\d{1,2}:\d{2}', '', reminder_text).strip()
+    return {
+        "chat_id": chat_id,
+        "text": reminder_text,
+        "event_time": event_time.strftime("%H:%M"),
+        "notify_at": notify_at.isoformat(),
+        "notified": False
+    }
+
+def save_reminder(reminder: dict):
+    reminders = load_json(REMINDERS_FILE)
+    chat_id = reminder["chat_id"]
+    if chat_id not in reminders:
+        reminders[chat_id] = []
+    reminders[chat_id].append(reminder)
+    save_json(REMINDERS_FILE, reminders)
 
 def get_weather():
     try:
@@ -164,6 +196,24 @@ async def check_inactive_chats(context: ContextTypes.DEFAULT_TYPE):
                 chat_activity[chat_key] = now.isoformat()
     save_json(LAST_CHAT_ACTIVITY_FILE, chat_activity)
 
+async def check_reminders(context: ContextTypes.DEFAULT_TYPE):
+    now_moscow = datetime.utcnow() + timedelta(hours=3)
+    reminders = load_json(REMINDERS_FILE)
+    changed = False
+    for chat_id, chat_reminders in reminders.items():
+        for reminder in chat_reminders:
+            if not reminder["notified"]:
+                notify_at = datetime.fromisoformat(reminder["notify_at"])
+                if now_moscow >= notify_at:
+                    await context.bot.send_message(
+                        chat_id=int(chat_id),
+                        text=f"🔔 Напоминание: {reminder['text']} через 2 часа (в {reminder['event_time']})!"
+                    )
+                    reminder["notified"] = True
+                    changed = True
+    if changed:
+        save_json(REMINDERS_FILE, reminders)
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.id not in ALLOWED_CHAT_IDS:
         return
@@ -202,13 +252,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if msg.text and f"@{BOT_USERNAME}" in msg.text:
         question = msg.text.replace(f"@{BOT_USERNAME}", "").strip()
         if question:
-            answer = ask_gpt(question, chat_id)
-            await msg.reply_text(answer)
+            if re.search(r'напомни', question, re.IGNORECASE) and re.search(r'в\s+\d{1,2}:\d{2}', question):
+                reminder = parse_reminder(question, chat_id)
+                if reminder:
+                    save_reminder(reminder)
+                    await msg.reply_text(f"✅ Запомнил! Напомню про {reminder['text']} в {reminder['event_time']} (за 2 часа — в {datetime.fromisoformat(reminder['notify_at']).strftime('%H:%M')})")
+            else:
+                answer = ask_gpt(question, chat_id)
+                await msg.reply_text(answer)
 
 if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, handle_message))
     app.job_queue.run_repeating(check_inactive_chats, interval=600, first=60)
+    app.job_queue.run_repeating(check_reminders, interval=60, first=10)
     app.job_queue.run_daily(morning_digest, time=datetime.strptime("06:00", "%H:%M").time())
     print("Бот запущен!")
     app.run_polling()
