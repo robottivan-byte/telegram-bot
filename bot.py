@@ -60,20 +60,11 @@ CONDITIONS = {
 }
 
 CONDITION_EMOJI = {
-    "clear": "☀️",
-    "partly-cloudy": "🌤",
-    "cloudy": "⛅",
-    "overcast": "☁️",
-    "light-rain": "🌦",
-    "rain": "🌧",
-    "heavy-rain": "⛈",
-    "snow": "❄️",
-    "light-snow": "🌨",
-    "snowfall": "☃️",
-    "hail": "🌩",
-    "thunderstorm": "⛈",
-    "fog": "🌫",
-    "drizzle": "🌧",
+    "clear": "☀️", "partly-cloudy": "🌤", "cloudy": "⛅",
+    "overcast": "☁️", "light-rain": "🌦", "rain": "🌧",
+    "heavy-rain": "⛈", "snow": "❄️", "light-snow": "🌨",
+    "snowfall": "☃️", "hail": "🌩", "thunderstorm": "⛈",
+    "fog": "🌫", "drizzle": "🌧",
 }
 
 def load_json(filename):
@@ -116,10 +107,8 @@ def get_weather():
         with urllib.request.urlopen(req, timeout=10) as r:
             data = json.loads(r.read())
         fact = data["fact"]
-        temp = fact["temp"]
-        feels = fact["feels_like"]
         desc = CONDITIONS.get(fact["condition"], fact["condition"])
-        return f"🌤 Погода в Санкт-Петербурге: {desc}, {temp}°C (ощущается как {feels}°C)"
+        return f"🌤 Погода в Санкт-Петербурге: {desc}, {fact['temp']}°C (ощущается как {fact['feels_like']}°C)"
     except Exception as e:
         return f"🌤 Погода: не удалось получить данные ({e})"
 
@@ -132,11 +121,10 @@ def get_weather_forecast():
         tomorrow = data["forecasts"][1]
         day = tomorrow["parts"]["day"]
         night = tomorrow["parts"]["night"]
-        date_str = tomorrow["date"]
         day_desc = CONDITIONS.get(day["condition"], day["condition"])
         night_desc = CONDITIONS.get(night["condition"], night["condition"])
         return (
-            f"📅 Прогноз на завтра ({date_str}), Санкт-Петербург:\n\n"
+            f"📅 Прогноз на завтра ({tomorrow['date']}), Санкт-Петербург:\n"
             f"☀️ День: {day_desc}, {day['temp_avg']}°C (ощущается как {day['feels_like']}°C)\n"
             f"🌙 Ночь: {night_desc}, {night['temp_avg']}°C (ощущается как {night['feels_like']}°C)"
         )
@@ -149,30 +137,22 @@ def get_weather_hourly(day_index=0, hours_from=None, hours_count=12):
         req = urllib.request.Request(url, headers={"X-Yandex-API-Key": YANDEX_WEATHER_KEY})
         with urllib.request.urlopen(req, timeout=10) as r:
             data = json.loads(r.read())
-
         now_moscow = datetime.utcnow() + timedelta(hours=3)
         if hours_from is None:
             hours_from = now_moscow.hour
-
         today_hours = data["forecasts"][0].get("hours", [])
         tomorrow_hours = data["forecasts"][1].get("hours", [])
-
         if day_index == 0:
             source = [h for h in today_hours if int(h["hour"]) >= hours_from] + tomorrow_hours
             label = "Прогноз на сегодня"
         else:
             source = tomorrow_hours
             label = "Прогноз на завтра"
-
         lines = []
         for h in source[:hours_count]:
-            h_hour = int(h["hour"])
-            temp = h["temp"]
             emoji = CONDITION_EMOJI.get(h["condition"], "🌡")
-            lines.append(f"{h_hour:02d}:00 {emoji} {temp}°C")
-
-        result = "\n".join(lines)
-        return f"🕐 {label}, Санкт-Петербург:\n\n{result}"
+            lines.append(f"{int(h['hour']):02d}:00 {emoji} {h['temp']}°C")
+        return f"🕐 {label}, Санкт-Петербург:\n\n" + "\n".join(lines)
     except Exception as e:
         return f"🕐 Почасовой прогноз: не удалось получить данные ({e})"
 
@@ -185,13 +165,63 @@ def get_currency():
         rates = {}
         for valute in root.findall("Valute"):
             char_code = valute.find("CharCode").text
-            value = valute.find("Value").text.replace(",", ".")
-            nominal = valute.find("Nominal").text
-            if char_code in ("USD", "EUR"):
-                rates[char_code] = round(float(value) / int(nominal), 2)
-        return f"💵 Курс ЦБ: USD — {rates.get('USD', '?')}₽ | EUR — {rates.get('EUR', '?')}₽"
+            value = float(valute.find("Value").text.replace(",", "."))
+            nominal = int(valute.find("Nominal").text)
+            if char_code in ("USD", "EUR", "CNY"):
+                rates[char_code] = round(value / nominal, 2)
+        return (
+            f"💵 Курс ЦБ:\n"
+            f"  USD — {rates.get('USD', '?')}₽\n"
+            f"  EUR — {rates.get('EUR', '?')}₽\n"
+            f"  CNY — {rates.get('CNY', '?')}₽"
+        )
     except:
         return "💵 Курс валют: не удалось получить данные"
+
+def get_bitcoin():
+    try:
+        url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=rub,usd"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=10) as r:
+            data = json.loads(r.read())
+        btc = data["bitcoin"]
+        rub = f"{btc['rub']:,.0f}".replace(",", " ")
+        usd = f"{btc['usd']:,.0f}".replace(",", " ")
+        return f"₿ Bitcoin: {usd}$ / {rub}₽"
+    except Exception as e:
+        return f"₿ Bitcoin: не удалось получить данные ({e})"
+
+def get_moex():
+    try:
+        url = "https://iss.moex.com/iss/engines/stock/markets/index/boards/SNDX/securities/IMOEX.json?iss.meta=off"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=10) as r:
+            data = json.loads(r.read())
+        cols = data["marketdata"]["columns"]
+        rows = data["marketdata"]["data"]
+        if not rows:
+            return "📊 ММВБ: нет данных"
+        row = rows[0]
+        last = row[cols.index("CURRENTVALUE")]
+        if last is None:
+            return "📊 ММВБ: нет данных (рынок закрыт)"
+        return f"📊 ММВБ (IMOEX): {last:,.2f}"
+    except Exception as e:
+        return f"📊 ММВБ: не удалось получить данные ({e})"
+
+def get_nasdaq():
+    try:
+        url = "https://query1.finance.yahoo.com/v8/finance/chart/%5EIXIC?interval=1d&range=1d"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=10) as r:
+            data = json.loads(r.read())
+        meta = data["chart"]["result"][0]["meta"]
+        price = meta.get("regularMarketPrice") or meta.get("previousClose")
+        change_pct = ((price - meta["previousClose"]) / meta["previousClose"] * 100) if meta.get("previousClose") else 0
+        arrow = "📈" if change_pct >= 0 else "📉"
+        return f"{arrow} NASDAQ: {price:,.2f} ({change_pct:+.2f}%)"
+    except Exception as e:
+        return f"📈 NASDAQ: не удалось получить данные ({e})"
 
 def get_news():
     try:
@@ -212,16 +242,11 @@ def ask_gpt(question: str, chat_id: str) -> str:
         history = get_history(chat_id)
         history_text = "\n".join(f"{m['name']}: {m['text']}" for m in history)
         now_moscow = datetime.utcnow() + timedelta(hours=3)
-        current_time = now_moscow.strftime("%H:%M")
         messages = [
-            {"role": "system", "content": f"Ты — Пятница, дружелюбный бот для группового чата друзей. Версия 6. Отвечай коротко, по-русски, неформально. Сейчас московское время: {current_time}.\n\nПоследние сообщения в чате:\n{history_text}"},
+            {"role": "system", "content": f"Ты — Пятница, дружелюбный бот для группового чата друзей. Версия 6. Отвечай коротко, по-русски, неформально. Сейчас московское время: {now_moscow.strftime('%H:%M')}.\n\nПоследние сообщения в чате:\n{history_text}"},
             {"role": "user", "content": question}
         ]
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=messages,
-            max_tokens=500
-        )
+        response = client.chat.completions.create(model="gpt-4o-mini", messages=messages, max_tokens=500)
         return response.choices[0].message.content
     except Exception as e:
         return f"Ошибка: {e}"
@@ -273,22 +298,33 @@ def parse_poll(text: str):
     options = [o.strip() for o in options if o.strip()]
     return options if len(options) >= 2 else None
 
-# 06:00 UTC = 09:00 МСК
+# 06:01 UTC = 09:01 МСК
 async def morning_digest(context: ContextTypes.DEFAULT_TYPE):
     weather = get_weather()
     hourly = get_weather_hourly(day_index=0, hours_from=9, hours_count=14)
     currency = get_currency()
+    bitcoin = get_bitcoin()
+    moex = get_moex()
+    nasdaq = get_nasdaq()
     news = get_news()
-    text = f"☀️ Доброе утро!\n\n{weather}\n\n{hourly}\n\n{currency}\n\n{news}"
+    text = (
+        f"☀️ Доброе утро! Сводка на {datetime.utcnow().strftime('%d.%m.%Y')}:\n\n"
+        f"{weather}\n\n"
+        f"{hourly}\n\n"
+        f"{currency}\n\n"
+        f"{bitcoin}\n"
+        f"{moex}\n"
+        f"{nasdaq}\n\n"
+        f"{news}"
+    )
     for chat_id in ALLOWED_CHAT_IDS:
         await context.bot.send_message(chat_id=chat_id, text=text)
 
 # 20:00 UTC = 23:00 МСК
 async def evening_forecast(context: ContextTypes.DEFAULT_TYPE):
     forecast = get_weather_hourly(day_index=1, hours_from=0, hours_count=24)
-    text = f"🌙 Прогноз на завтра по часам:\n\n{forecast}"
     for chat_id in ALLOWED_CHAT_IDS:
-        await context.bot.send_message(chat_id=chat_id, text=text)
+        await context.bot.send_message(chat_id=chat_id, text=f"🌙 Прогноз на завтра по часам:\n\n{forecast}")
 
 async def check_inactive_chats(context: ContextTypes.DEFAULT_TYPE):
     now = datetime.utcnow()
@@ -376,6 +412,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif re.search(r'^курс$', question, re.IGNORECASE):
             await msg.reply_text(get_currency())
 
+        elif re.search(r'^биткоин$|^btc$', question, re.IGNORECASE):
+            await msg.reply_text(get_bitcoin())
+
+        elif re.search(r'^ммвб$|^moex$', question, re.IGNORECASE):
+            await msg.reply_text(get_moex())
+
+        elif re.search(r'^nasdaq$|^насдак$', question, re.IGNORECASE):
+            await msg.reply_text(get_nasdaq())
+
         elif re.search(r'^новости$', question, re.IGNORECASE):
             await msg.reply_text(get_news())
 
@@ -420,7 +465,7 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, handle_message))
     app.job_queue.run_repeating(check_inactive_chats, interval=600, first=60)
     app.job_queue.run_repeating(check_reminders, interval=60, first=10)
-    app.job_queue.run_daily(morning_digest, time=time(6, 0))   # 09:00 МСК
+    app.job_queue.run_daily(morning_digest, time=time(6, 1))    # 09:01 МСК
     app.job_queue.run_daily(evening_forecast, time=time(20, 0)) # 23:00 МСК
     print("Бот запущен!")
     app.run_polling()
