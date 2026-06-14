@@ -175,6 +175,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_name = user.first_name or user.username or "друг"
     now = datetime.utcnow()
     msg = update.message
+    if not msg:
+        return
 
     last_seen = load_json(LAST_SEEN_FILE)
     if user_id in last_seen:
