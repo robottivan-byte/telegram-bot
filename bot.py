@@ -88,6 +88,16 @@ def format_duration(delta: timedelta) -> str:
     else:
         return f"{hours} ч {minutes} мин"
 
+def get_last_seen_time(entry) -> datetime:
+    if isinstance(entry, dict):
+        return datetime.fromisoformat(entry["last_seen"])
+    return datetime.fromisoformat(entry)
+
+def get_last_seen_name(entry, user_id="") -> str:
+    if isinstance(entry, dict):
+        return entry.get("name", user_id)
+    return user_id
+
 def add_to_history(chat_id: str, name: str, text: str):
     history = load_json(CHAT_HISTORY_FILE)
     if chat_id not in history:
@@ -99,6 +109,26 @@ def add_to_history(chat_id: str, name: str, text: str):
 def get_history(chat_id: str) -> list:
     history = load_json(CHAT_HISTORY_FILE)
     return history.get(chat_id, [])
+
+def get_user_absence(name: str) -> str:
+    last_seen = load_json(LAST_SEEN_FILE)
+    now = datetime.utcnow()
+    name_lower = name.lower().strip()
+    best_match = None
+    best_name = ""
+    for uid, entry in last_seen.items():
+        stored_name = get_last_seen_name(entry, uid)
+        if name_lower in stored_name.lower():
+            last_time = get_last_seen_time(entry)
+            best_match = last_time
+            best_name = stored_name
+            break
+    if best_match is None:
+        return f"👤 Не нашёл {name} в истории чата"
+    delta = now - best_match
+    if delta.total_seconds() < 300:
+        return f"👤 {best_name} был в чате только что"
+    return f"👤 {best_name} отсутствует уже {format_duration(delta)}"
 
 def get_weather():
     try:
@@ -201,8 +231,7 @@ def get_moex():
         rows = data["marketdata"]["data"]
         if not rows:
             return "📊 ММВБ: нет данных"
-        row = rows[0]
-        last = row[cols.index("CURRENTVALUE")]
+        last = rows[0][cols.index("CURRENTVALUE")]
         if last is None:
             return "📊 ММВБ: нет данных (рынок закрыт)"
         return f"📊 ММВБ (IMOEX): {last:,.2f}"
@@ -247,6 +276,7 @@ def get_commands_text():
         "📊 ммвб — индекс Мосбиржи\n"
         "📊 nasdaq — индекс NASDAQ\n"
         "📰 новости — топ новости\n"
+        "👤 сколько отсутствовал Имя — время отсутствия\n"
         "🗳 голосование X или Y или Z — создать опрос\n"
         "🔔 напомнить \"19:30\" текст \"баня\" — напоминание\n"
         "💬 любой вопрос — отвечу через AI\n\n"
@@ -392,13 +422,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     last_seen = load_json(LAST_SEEN_FILE)
     if user_id in last_seen:
-        last_time = datetime.fromisoformat(last_seen[user_id])
+        last_time = get_last_seen_time(last_seen[user_id])
         delta = now - last_time
         if delta >= timedelta(hours=AWAY_THRESHOLD_HOURS):
             time_str = format_duration(delta)
             greeting = GREETINGS[user.id % len(GREETINGS)].format(name=user_name, time=time_str)
             await msg.reply_text(greeting)
-    last_seen[user_id] = now.isoformat()
+
+    last_seen[user_id] = {"last_seen": now.isoformat(), "name": user_name}
     save_json(LAST_SEEN_FILE, last_seen)
 
     chat_activity = load_json(LAST_CHAT_ACTIVITY_FILE)
@@ -443,6 +474,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif re.search(r'^новости$', question, re.IGNORECASE):
             await msg.reply_text(get_news())
 
+        elif re.search(r'сколько отсутствовал|когда был[а]?', question, re.IGNORECASE):
+            name = re.sub(r'сколько отсутствовал|когда был[а]?', '', question, flags=re.IGNORECASE).strip()
+            await msg.reply_text(get_user_absence(name))
+
         elif re.search(r'напомнить\s+"', question, re.IGNORECASE):
             reminder = parse_reminder(question, chat_id)
             if reminder:
@@ -484,7 +519,7 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, handle_message))
     app.job_queue.run_repeating(check_inactive_chats, interval=600, first=60)
     app.job_queue.run_repeating(check_reminders, interval=60, first=10)
-    app.job_queue.run_daily(morning_digest, time=time(6, 1))    # 09:01 МСК
-    app.job_queue.run_daily(evening_forecast, time=time(20, 0)) # 23:00 МСК
+    app.job_queue.run_daily(morning_digest, time=time(6, 1))
+    app.job_queue.run_daily(evening_forecast, time=time(20, 0))
     print("Бот Пятница Вариант 7 запущен!")
     app.run_polling()
