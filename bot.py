@@ -2,6 +2,7 @@ import json
 import os
 import re
 import random
+import asyncio
 import xml.etree.ElementTree as ET
 import urllib.request
 from datetime import datetime, timedelta, time
@@ -130,10 +131,7 @@ def football_request(url):
         return None
     req = urllib.request.Request(
         url,
-        headers={
-            "X-Auth-Token": FOOTBALL_API_KEY,
-            "User-Agent": "Mozilla/5.0"
-        }
+        headers={"X-Auth-Token": FOOTBALL_API_KEY, "User-Agent": "Mozilla/5.0"}
     )
     with urllib.request.urlopen(req, timeout=15) as r:
         return json.loads(r.read())
@@ -191,7 +189,7 @@ def get_world_cup_results():
         return "\n".join(lines)
     except urllib.error.HTTPError as e:
         if e.code == 403:
-            return "⚽ ЧМ 2026: нет доступа — проверь API ключ на football-data.org"
+            return "⚽ ЧМ 2026: нет доступа — проверь API ключ"
         if e.code == 404:
             return "⚽ ЧМ 2026: турнир ещё не добавлен в API"
         return f"⚽ ЧМ 2026: ошибка {e.code}"
@@ -475,6 +473,7 @@ async def morning_digest(context: ContextTypes.DEFAULT_TYPE):
     moex = get_moex()
     nasdaq = get_nasdaq()
     news = get_news()
+    await asyncio.sleep(2)
     wc = get_world_cup_results()
     text = (
         f"☀️ Доброе утро! Сводка на {now_moscow.strftime('%d.%m.%Y')}:\n\n"
@@ -489,6 +488,7 @@ async def morning_digest(context: ContextTypes.DEFAULT_TYPE):
 
 async def evening_forecast(context: ContextTypes.DEFAULT_TYPE):
     forecast = get_weather_hourly(day_index=1, hours_from=0, hours_count=24)
+    await asyncio.sleep(2)
     wc = get_world_cup_today()
     text = f"🌙 Вечерняя сводка:\n\n{forecast}\n\n{wc}"
     for chat_id in ALLOWED_CHAT_IDS:
