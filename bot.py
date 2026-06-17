@@ -125,17 +125,29 @@ def get_user_absence(name: str) -> str:
             return f"👤 {stored_name} отсутствует уже {format_duration(delta)}"
     return f"👤 Не нашёл {name} в истории чата"
 
+def football_request(url):
+    if not FOOTBALL_API_KEY:
+        return None
+    req = urllib.request.Request(
+        url,
+        headers={
+            "X-Auth-Token": FOOTBALL_API_KEY,
+            "User-Agent": "Mozilla/5.0"
+        }
+    )
+    with urllib.request.urlopen(req, timeout=15) as r:
+        return json.loads(r.read())
+
 def get_world_cup_results():
     if not FOOTBALL_API_KEY:
-        return "⚽ ЧМ 2026: API ключ не настроен"
+        return "⚽ ЧМ 2026: добавь FOOTBALL_API_KEY в Railway Variables"
     try:
         now_moscow = datetime.utcnow() + timedelta(hours=3)
         today_str = now_moscow.strftime("%Y-%m-%d")
 
-        url = "https://api.football-data.org/v4/competitions/WC/matches?status=FINISHED"
-        req = urllib.request.Request(url, headers={"X-Auth-Token": FOOTBALL_API_KEY})
-        with urllib.request.urlopen(req, timeout=10) as r:
-            data = json.loads(r.read())
+        data = football_request("https://api.football-data.org/v4/competitions/WC/matches?status=FINISHED")
+        if not data:
+            return "⚽ ЧМ 2026: нет данных"
 
         matches = data.get("matches", [])
         if not matches:
@@ -146,8 +158,8 @@ def get_world_cup_results():
             utc_dt = datetime.fromisoformat(m["utcDate"].replace("Z", "+00:00"))
             moscow_dt = utc_dt + timedelta(hours=3)
             moscow_date = moscow_dt.strftime("%d.%m")
-            home = m["homeTeam"].get("shortName") or m["homeTeam"]["name"]
-            away = m["awayTeam"].get("shortName") or m["awayTeam"]["name"]
+            home = m["homeTeam"].get("shortName") or m["homeTeam"].get("name", "?")
+            away = m["awayTeam"].get("shortName") or m["awayTeam"].get("name", "?")
             score = m["score"]["fullTime"]
             hg = score["home"] if score["home"] is not None else "-"
             ag = score["away"] if score["away"] is not None else "-"
@@ -156,56 +168,56 @@ def get_world_cup_results():
             by_date[moscow_date].append(f"  {home} {hg}:{ag} {away}")
 
         lines = ["⚽ ЧМ 2026 — все результаты:\n"]
-        for date_key in sorted(by_date.keys(), key=lambda d: datetime.strptime(d + f".{now_moscow.year}", "%d.%m.%Y")):
+        for date_key in sorted(by_date.keys(), key=lambda d: datetime.strptime(d + ".2026", "%d.%m.%Y")):
             lines.append(f"📅 {date_key}")
             lines.extend(by_date[date_key])
             lines.append("")
 
-        url2 = "https://api.football-data.org/v4/competitions/WC/matches?status=SCHEDULED"
-        req2 = urllib.request.Request(url2, headers={"X-Auth-Token": FOOTBALL_API_KEY})
-        with urllib.request.urlopen(req2, timeout=10) as r2:
-            data2 = json.loads(r2.read())
-
+        data2 = football_request("https://api.football-data.org/v4/competitions/WC/matches?status=SCHEDULED")
         today_matches = []
-        for m in data2.get("matches", []):
-            utc_dt = datetime.fromisoformat(m["utcDate"].replace("Z", "+00:00"))
-            moscow_dt = utc_dt + timedelta(hours=3)
-            if moscow_dt.strftime("%Y-%m-%d") == today_str:
-                home = m["homeTeam"].get("shortName") or m["homeTeam"]["name"]
-                away = m["awayTeam"].get("shortName") or m["awayTeam"]["name"]
-                today_matches.append(f"  {moscow_dt.strftime('%H:%M')} | {home} — {away}")
+        if data2:
+            for m in data2.get("matches", []):
+                utc_dt = datetime.fromisoformat(m["utcDate"].replace("Z", "+00:00"))
+                moscow_dt = utc_dt + timedelta(hours=3)
+                if moscow_dt.strftime("%Y-%m-%d") == today_str:
+                    home = m["homeTeam"].get("shortName") or m["homeTeam"].get("name", "?")
+                    away = m["awayTeam"].get("shortName") or m["awayTeam"].get("name", "?")
+                    today_matches.append(f"  {moscow_dt.strftime('%H:%M')} | {home} — {away}")
 
         if today_matches:
             lines.append("🔜 Сегодня играют:")
             lines.extend(today_matches)
 
         return "\n".join(lines)
+    except urllib.error.HTTPError as e:
+        if e.code == 403:
+            return "⚽ ЧМ 2026: нет доступа — проверь API ключ на football-data.org"
+        if e.code == 404:
+            return "⚽ ЧМ 2026: турнир ещё не добавлен в API"
+        return f"⚽ ЧМ 2026: ошибка {e.code}"
     except Exception as e:
         return f"⚽ ЧМ 2026: не удалось получить данные ({e})"
 
 def get_world_cup_today():
     if not FOOTBALL_API_KEY:
-        return "⚽ ЧМ 2026: API ключ не настроен"
+        return "⚽ ЧМ 2026: добавь FOOTBALL_API_KEY в Railway Variables"
     try:
         now_moscow = datetime.utcnow() + timedelta(hours=3)
         today_str = now_moscow.strftime("%Y-%m-%d")
         tomorrow_str = (now_moscow + timedelta(days=1)).strftime("%Y-%m-%d")
         lines = []
 
-        url = "https://api.football-data.org/v4/competitions/WC/matches?status=FINISHED"
-        req = urllib.request.Request(url, headers={"X-Auth-Token": FOOTBALL_API_KEY})
-        with urllib.request.urlopen(req, timeout=10) as r:
-            data = json.loads(r.read())
-
+        data = football_request("https://api.football-data.org/v4/competitions/WC/matches?status=FINISHED")
         today_finished = []
-        for m in data.get("matches", []):
-            utc_dt = datetime.fromisoformat(m["utcDate"].replace("Z", "+00:00"))
-            moscow_dt = utc_dt + timedelta(hours=3)
-            if moscow_dt.strftime("%Y-%m-%d") == today_str:
-                home = m["homeTeam"].get("shortName") or m["homeTeam"]["name"]
-                away = m["awayTeam"].get("shortName") or m["awayTeam"]["name"]
-                score = m["score"]["fullTime"]
-                today_finished.append(f"  {home} {score['home']}:{score['away']} {away}")
+        if data:
+            for m in data.get("matches", []):
+                utc_dt = datetime.fromisoformat(m["utcDate"].replace("Z", "+00:00"))
+                moscow_dt = utc_dt + timedelta(hours=3)
+                if moscow_dt.strftime("%Y-%m-%d") == today_str:
+                    home = m["homeTeam"].get("shortName") or m["homeTeam"].get("name", "?")
+                    away = m["awayTeam"].get("shortName") or m["awayTeam"].get("name", "?")
+                    score = m["score"]["fullTime"]
+                    today_finished.append(f"  {home} {score['home']}:{score['away']} {away}")
 
         if today_finished:
             lines.append(f"⚽ ЧМ 2026 — результаты за {now_moscow.strftime('%d.%m')}:")
@@ -213,25 +225,28 @@ def get_world_cup_today():
         else:
             lines.append("⚽ ЧМ 2026: сегодня матчей не было")
 
-        url2 = "https://api.football-data.org/v4/competitions/WC/matches?status=SCHEDULED"
-        req2 = urllib.request.Request(url2, headers={"X-Auth-Token": FOOTBALL_API_KEY})
-        with urllib.request.urlopen(req2, timeout=10) as r2:
-            data2 = json.loads(r2.read())
-
+        data2 = football_request("https://api.football-data.org/v4/competitions/WC/matches?status=SCHEDULED")
         tomorrow_matches = []
-        for m in data2.get("matches", []):
-            utc_dt = datetime.fromisoformat(m["utcDate"].replace("Z", "+00:00"))
-            moscow_dt = utc_dt + timedelta(hours=3)
-            if moscow_dt.strftime("%Y-%m-%d") == tomorrow_str:
-                home = m["homeTeam"].get("shortName") or m["homeTeam"]["name"]
-                away = m["awayTeam"].get("shortName") or m["awayTeam"]["name"]
-                tomorrow_matches.append(f"  {moscow_dt.strftime('%H:%M')} | {home} — {away}")
+        if data2:
+            for m in data2.get("matches", []):
+                utc_dt = datetime.fromisoformat(m["utcDate"].replace("Z", "+00:00"))
+                moscow_dt = utc_dt + timedelta(hours=3)
+                if moscow_dt.strftime("%Y-%m-%d") == tomorrow_str:
+                    home = m["homeTeam"].get("shortName") or m["homeTeam"].get("name", "?")
+                    away = m["awayTeam"].get("shortName") or m["awayTeam"].get("name", "?")
+                    tomorrow_matches.append(f"  {moscow_dt.strftime('%H:%M')} | {home} — {away}")
 
         if tomorrow_matches:
             lines.append(f"\n🔜 Завтра ({(now_moscow + timedelta(days=1)).strftime('%d.%m')}):")
             lines.extend(tomorrow_matches)
 
         return "\n".join(lines)
+    except urllib.error.HTTPError as e:
+        if e.code == 403:
+            return "⚽ ЧМ 2026: нет доступа — проверь API ключ"
+        if e.code == 404:
+            return "⚽ ЧМ 2026: турнир ещё не добавлен в API"
+        return f"⚽ ЧМ 2026: ошибка {e.code}"
     except Exception as e:
         return f"⚽ ЧМ 2026: не удалось получить данные ({e})"
 
@@ -399,7 +414,7 @@ def ask_gpt(question: str, chat_id: str) -> str:
             {"role": "system", "content": f"Ты — Пятница, дружелюбный бот для группового чата друзей. Вариант 7. Отвечай коротко, по-русски, неформально. Сейчас московское время: {now_moscow.strftime('%H:%M')}.\n\nПоследние сообщения в чате:\n{history_text}"},
             {"role": "user", "content": question}
         ]
-        response = client.chat.completions.create(model="gpt-4.1-mini", messages=messages, max_tokens=500)
+        response = client.chat.completions.create(model="gpt-4.1", messages=messages, max_tokens=500)
         return response.choices[0].message.content
     except Exception as e:
         return f"Ошибка: {e}"
@@ -463,12 +478,9 @@ async def morning_digest(context: ContextTypes.DEFAULT_TYPE):
     wc = get_world_cup_results()
     text = (
         f"☀️ Доброе утро! Сводка на {now_moscow.strftime('%d.%m.%Y')}:\n\n"
-        f"{weather}\n\n"
-        f"{hourly}\n\n"
+        f"{weather}\n\n{hourly}\n\n"
         f"{currency}\n\n"
-        f"{bitcoin}\n"
-        f"{moex}\n"
-        f"{nasdaq}\n\n"
+        f"{bitcoin}\n{moex}\n{nasdaq}\n\n"
         f"{news}\n\n"
         f"{wc}"
     )
@@ -559,38 +571,27 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if re.search(r'^команды$', question, re.IGNORECASE):
             await msg.reply_text(get_commands_text())
-
         elif re.search(r'^погода$', question, re.IGNORECASE):
             await msg.reply_text(get_weather())
-
         elif re.search(r'^прогноз$', question, re.IGNORECASE):
             await msg.reply_text(get_weather_forecast())
-
         elif re.search(r'^часы$', question, re.IGNORECASE):
             await msg.reply_text(get_weather_hourly())
-
         elif re.search(r'^курс$', question, re.IGNORECASE):
             await msg.reply_text(get_currency())
-
         elif re.search(r'^биткоин$|^btc$', question, re.IGNORECASE):
             await msg.reply_text(get_bitcoin())
-
         elif re.search(r'^ммвб$|^moex$', question, re.IGNORECASE):
             await msg.reply_text(get_moex())
-
         elif re.search(r'^nasdaq$|^насдак$', question, re.IGNORECASE):
             await msg.reply_text(get_nasdaq())
-
         elif re.search(r'^новости$', question, re.IGNORECASE):
             await msg.reply_text(get_news())
-
         elif re.search(r'^чм$|^чм2026$|^футбол$', question, re.IGNORECASE):
             await msg.reply_text(get_world_cup_results())
-
         elif re.search(r'сколько отсутствовал|когда был[а]?', question, re.IGNORECASE):
             name = re.sub(r'сколько отсутствовал|когда был[а]?', '', question, flags=re.IGNORECASE).strip()
             await msg.reply_text(get_user_absence(name))
-
         elif re.search(r'напомнить\s+"', question, re.IGNORECASE):
             reminder = parse_reminder(question, chat_id)
             if reminder:
@@ -610,7 +611,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     '❌ Не понял формат или время уже прошло.\n\n'
                     'Используй:\n@Fuckbook1Bot напомнить "19:30" текст "баня"'
                 )
-
         elif re.search(r'голосование', question, re.IGNORECASE):
             options = parse_poll(question)
             if options and len(options) >= 2:
@@ -622,7 +622,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
             else:
                 await msg.reply_text("Напиши так: @Fuckbook1Bot голосование баня или кино или ресторан")
-
         else:
             answer = ask_gpt(question, chat_id)
             await msg.reply_text(answer)
