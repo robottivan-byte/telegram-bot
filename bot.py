@@ -26,6 +26,13 @@ REMINDERS_FILE = "reminders.json"
 LAT = "59.9311"
 LON = "30.3609"
 
+SIGNS = {
+    "овен": "♈ Овен", "телец": "♉ Телец", "близнецы": "♊ Близнецы",
+    "рак": "♋ Рак", "лев": "♌ Лев", "дева": "♍ Дева",
+    "весы": "♎ Весы", "скорпион": "♏ Скорпион", "стрелец": "♐ Стрелец",
+    "козерог": "♑ Козерог", "водолей": "♒ Водолей", "рыбы": "♓ Рыбы"
+}
+
 GREETINGS = [
     "Привет, {name}! Тебя не было {time} 👋",
     "О, {name} вернулся! Отсутствовал {time} 😊",
@@ -126,6 +133,41 @@ def get_user_absence(name: str) -> str:
             return f"👤 {stored_name} отсутствует уже {format_duration(delta)}"
     return f"👤 Не нашёл {name} в истории чата"
 
+def get_horoscope_one(sign: str) -> str:
+    try:
+        sign_lower = sign.lower().strip()
+        sign_name = SIGNS.get(sign_lower)
+        if not sign_name:
+            return f"Не знаю такой знак. Напиши: Овен, Телец, Близнецы, Рак, Лев, Дева, Весы, Скорпион, Стрелец, Козерог, Водолей, Рыбы"
+        client = OpenAI(api_key=OPENAI_API_KEY)
+        now_moscow = datetime.utcnow() + timedelta(hours=3)
+        date_str = now_moscow.strftime("%d.%m.%Y")
+        response = client.chat.completions.create(
+            model="gpt-4.1",
+            messages=[{"role": "user", "content": f"Напиши гороскоп на {date_str} для знака {sign_name}. 3-4 предложения, позитивно, конкретно, по-русски. Без заголовка."}],
+            max_tokens=200
+        )
+        text = response.choices[0].message.content
+        return f"{sign_name} — гороскоп на {date_str}:\n{text}"
+    except Exception as e:
+        return f"🔮 Гороскоп: ошибка ({e})"
+
+def get_horoscope_all() -> str:
+    try:
+        client = OpenAI(api_key=OPENAI_API_KEY)
+        now_moscow = datetime.utcnow() + timedelta(hours=3)
+        date_str = now_moscow.strftime("%d.%m.%Y")
+        signs_list = ", ".join(SIGNS.values())
+        response = client.chat.completions.create(
+            model="gpt-4.1",
+            messages=[{"role": "user", "content": f"Напиши краткий гороскоп на {date_str} для каждого из 12 знаков зодиака: {signs_list}. Для каждого знака 1-2 предложения. Формат: эмодзи знак — текст. По-русски, позитивно."}],
+            max_tokens=800
+        )
+        text = response.choices[0].message.content
+        return f"🔮 Гороскоп на {date_str}:\n\n{text}"
+    except Exception as e:
+        return f"🔮 Гороскоп: ошибка ({e})"
+
 def football_request(url):
     if not FOOTBALL_API_KEY:
         return None
@@ -142,15 +184,12 @@ def get_world_cup_results():
     try:
         now_moscow = datetime.utcnow() + timedelta(hours=3)
         today_str = now_moscow.strftime("%Y-%m-%d")
-
         data = football_request("https://api.football-data.org/v4/competitions/WC/matches?status=FINISHED")
         if not data:
             return "⚽ ЧМ 2026: нет данных"
-
         matches = data.get("matches", [])
         if not matches:
             return "⚽ ЧМ 2026: матчи ещё не сыграны"
-
         by_date = {}
         for m in matches:
             utc_dt = datetime.fromisoformat(m["utcDate"].replace("Z", "+00:00"))
@@ -164,13 +203,11 @@ def get_world_cup_results():
             if moscow_date not in by_date:
                 by_date[moscow_date] = []
             by_date[moscow_date].append(f"  {home} {hg}:{ag} {away}")
-
         lines = ["⚽ ЧМ 2026 — все результаты:\n"]
         for date_key in sorted(by_date.keys(), key=lambda d: datetime.strptime(d + ".2026", "%d.%m.%Y")):
             lines.append(f"📅 {date_key}")
             lines.extend(by_date[date_key])
             lines.append("")
-
         data2 = football_request("https://api.football-data.org/v4/competitions/WC/matches?status=SCHEDULED")
         today_matches = []
         if data2:
@@ -181,11 +218,9 @@ def get_world_cup_results():
                     home = m["homeTeam"].get("shortName") or m["homeTeam"].get("name", "?")
                     away = m["awayTeam"].get("shortName") or m["awayTeam"].get("name", "?")
                     today_matches.append(f"  {moscow_dt.strftime('%H:%M')} | {home} — {away}")
-
         if today_matches:
             lines.append("🔜 Сегодня играют:")
             lines.extend(today_matches)
-
         return "\n".join(lines)
     except urllib.error.HTTPError as e:
         if e.code == 403:
@@ -204,7 +239,6 @@ def get_world_cup_today():
         today_str = now_moscow.strftime("%Y-%m-%d")
         tomorrow_str = (now_moscow + timedelta(days=1)).strftime("%Y-%m-%d")
         lines = []
-
         data = football_request("https://api.football-data.org/v4/competitions/WC/matches?status=FINISHED")
         today_finished = []
         if data:
@@ -216,13 +250,11 @@ def get_world_cup_today():
                     away = m["awayTeam"].get("shortName") or m["awayTeam"].get("name", "?")
                     score = m["score"]["fullTime"]
                     today_finished.append(f"  {home} {score['home']}:{score['away']} {away}")
-
         if today_finished:
             lines.append(f"⚽ ЧМ 2026 — результаты за {now_moscow.strftime('%d.%m')}:")
             lines.extend(today_finished)
         else:
             lines.append("⚽ ЧМ 2026: сегодня матчей не было")
-
         data2 = football_request("https://api.football-data.org/v4/competitions/WC/matches?status=SCHEDULED")
         tomorrow_matches = []
         if data2:
@@ -233,11 +265,9 @@ def get_world_cup_today():
                     home = m["homeTeam"].get("shortName") or m["homeTeam"].get("name", "?")
                     away = m["awayTeam"].get("shortName") or m["awayTeam"].get("name", "?")
                     tomorrow_matches.append(f"  {moscow_dt.strftime('%H:%M')} | {home} — {away}")
-
         if tomorrow_matches:
             lines.append(f"\n🔜 Завтра ({(now_moscow + timedelta(days=1)).strftime('%d.%m')}):")
             lines.extend(tomorrow_matches)
-
         return "\n".join(lines)
     except urllib.error.HTTPError as e:
         if e.code == 403:
@@ -395,9 +425,12 @@ def get_commands_text():
         "📊 nasdaq — индекс NASDAQ\n"
         "📰 новости — топ новости\n"
         "⚽ чм — все результаты ЧМ 2026\n"
+        "🔮 гороскоп — все знаки на сегодня\n"
+        "🔮 гороскоп Овен — гороскоп для знака\n"
         "👤 сколько отсутствовал Имя — время отсутствия\n"
         "🗳 голосование X или Y или Z — создать опрос\n"
         "🔔 напомнить \"19:30\" текст \"баня\" — напоминание\n"
+        "📋 команды — список команд\n"
         "💬 любой вопрос — отвечу через AI\n\n"
         "Все команды пишутся через @Fuckbook1Bot"
     )
@@ -409,7 +442,7 @@ def ask_gpt(question: str, chat_id: str) -> str:
         history_text = "\n".join(f"{m['name']}: {m['text']}" for m in history)
         now_moscow = datetime.utcnow() + timedelta(hours=3)
         messages = [
-            {"role": "system", "content": f"Ты — Пятница, дружелюбный бот для группового чата друзей. Вариант 7. Отвечай коротко, по-русски, неформально. Сейчас московское время: {now_moscow.strftime('%H:%M')}.\n\nПоследние сообщения в чате:\n{history_text}"},
+            {"role": "system", "content": f"Ты — Пятница, дружелюбный бот для группового чата друзей. Вариант 8. Отвечай коротко, по-русски, неформально. Сейчас московское время: {now_moscow.strftime('%H:%M')}.\n\nПоследние сообщения в чате:\n{history_text}"},
             {"role": "user", "content": question}
         ]
         response = client.chat.completions.create(model="gpt-4.1", messages=messages, max_tokens=500)
@@ -485,6 +518,11 @@ async def morning_digest(context: ContextTypes.DEFAULT_TYPE):
     )
     for chat_id in ALLOWED_CHAT_IDS:
         await context.bot.send_message(chat_id=chat_id, text=text)
+
+async def daily_horoscope(context: ContextTypes.DEFAULT_TYPE):
+    horoscope = get_horoscope_all()
+    for chat_id in ALLOWED_CHAT_IDS:
+        await context.bot.send_message(chat_id=chat_id, text=horoscope)
 
 async def evening_forecast(context: ContextTypes.DEFAULT_TYPE):
     forecast = get_weather_hourly(day_index=1, hours_from=0, hours_count=24)
@@ -589,6 +627,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.reply_text(get_news())
         elif re.search(r'^чм$|^чм2026$|^футбол$', question, re.IGNORECASE):
             await msg.reply_text(get_world_cup_results())
+        elif re.search(r'^гороскоп$', question, re.IGNORECASE):
+            await msg.reply_text(get_horoscope_all())
+        elif re.search(r'^гороскоп\s+\S+', question, re.IGNORECASE):
+            sign = re.sub(r'^гороскоп\s+', '', question, flags=re.IGNORECASE).strip()
+            await msg.reply_text(get_horoscope_one(sign))
         elif re.search(r'сколько отсутствовал|когда был[а]?', question, re.IGNORECASE):
             name = re.sub(r'сколько отсутствовал|когда был[а]?', '', question, flags=re.IGNORECASE).strip()
             await msg.reply_text(get_user_absence(name))
@@ -631,7 +674,8 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, handle_message))
     app.job_queue.run_repeating(check_inactive_chats, interval=600, first=60)
     app.job_queue.run_repeating(check_reminders, interval=60, first=10)
-    app.job_queue.run_daily(morning_digest, time=time(6, 1))
-    app.job_queue.run_daily(evening_forecast, time=time(20, 0))
-    print("Бот Пятница Вариант 7 запущен!")
+    app.job_queue.run_daily(morning_digest, time=time(6, 1))   # 09:01 МСК
+    app.job_queue.run_daily(daily_horoscope, time=time(6, 2))  # 09:02 МСК
+    app.job_queue.run_daily(evening_forecast, time=time(20, 0)) # 23:00 МСК
+    print("Бот Пятница Про Вариант 8 запущен!")
     app.run_polling()
