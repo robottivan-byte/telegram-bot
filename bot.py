@@ -14,7 +14,7 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN")
 YANDEX_WEATHER_KEY = os.environ.get("YANDEX_WEATHER_KEY")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 FOOTBALL_API_KEY = os.environ.get("FOOTBALL_API_KEY")
-ALLOWED_CHAT_IDS = [-5102540817, -437147591]
+ALLOWED_CHAT_IDS = [-5102540817, -437147591, -5182288388]
 BOT_USERNAME = "Fuckbook1Bot"
 AWAY_THRESHOLD_HOURS = 3
 INACTIVE_HOURS = 3
@@ -138,7 +138,7 @@ def get_horoscope_one(sign: str) -> str:
         sign_lower = sign.lower().strip()
         sign_name = SIGNS.get(sign_lower)
         if not sign_name:
-            return f"Не знаю такой знак. Напиши: Овен, Телец, Близнецы, Рак, Лев, Дева, Весы, Скорпион, Стрелец, Козерог, Водолей, Рыбы"
+            return "Не знаю такой знак. Напиши: Овен, Телец, Близнецы, Рак, Лев, Дева, Весы, Скорпион, Стрелец, Козерог, Водолей, Рыбы"
         client = OpenAI(api_key=OPENAI_API_KEY)
         now_moscow = datetime.utcnow() + timedelta(hours=3)
         date_str = now_moscow.strftime("%d.%m.%Y")
@@ -442,7 +442,7 @@ def ask_gpt(question: str, chat_id: str) -> str:
         history_text = "\n".join(f"{m['name']}: {m['text']}" for m in history)
         now_moscow = datetime.utcnow() + timedelta(hours=3)
         messages = [
-            {"role": "system", "content": f"Ты — Пятница, дружелюбный бот для группового чата друзей. Вариант 8. Отвечай коротко, по-русски, неформально. Сейчас московское время: {now_moscow.strftime('%H:%M')}.\n\nПоследние сообщения в чате:\n{history_text}"},
+            {"role": "system", "content": f"Ты — Пятница, дружелюбный бот для группового чата друзей. Вариант 9. Отвечай коротко, по-русски, неформально. Сейчас московское время: {now_moscow.strftime('%H:%M')}.\n\nПоследние сообщения в чате:\n{history_text}"},
             {"role": "user", "content": question}
         ]
         response = client.chat.completions.create(model="gpt-4.1", messages=messages, max_tokens=500)
@@ -674,8 +674,8 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, handle_message))
     app.job_queue.run_repeating(check_inactive_chats, interval=600, first=60)
     app.job_queue.run_repeating(check_reminders, interval=60, first=10)
-    app.job_queue.run_daily(morning_digest, time=time(6, 1))   # 09:01 МСК
-    app.job_queue.run_daily(daily_horoscope, time=time(6, 2))  # 09:02 МСК
+    app.job_queue.run_daily(morning_digest, time=time(6, 1))    # 09:01 МСК
+    app.job_queue.run_daily(daily_horoscope, time=time(6, 2))   # 09:02 МСК
     app.job_queue.run_daily(evening_forecast, time=time(20, 0)) # 23:00 МСК
-    print("Бот Пятница Про Вариант 8 запущен!")
+    print("Бот Пятница Про Вариант 9 запущен!")
     app.run_polling()
