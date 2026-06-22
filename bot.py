@@ -90,12 +90,15 @@ CONDITIONS = {
     "fog": "Туман", "drizzle": "Морось"
 }
 
-CONDITION_EMOJI = {
-    "clear": "☀️", "partly-cloudy": "🌤", "cloudy": "⛅",
-    "overcast": "☁️", "light-rain": "🌦", "rain": "🌧",
-    "heavy-rain": "⛈", "snow": "❄️", "light-snow": "🌨",
-    "snowfall": "☃️", "hail": "🌩", "thunderstorm": "⛈",
-    "fog": "🌫", "drizzle": "🌧",
+WMO_EMOJI = {
+    0: "☀️", 1: "🌤", 2: "⛅", 3: "☁️",
+    45: "🌫", 48: "🌫",
+    51: "🌧", 53: "🌧", 55: "🌧",
+    61: "🌦", 63: "🌧", 65: "⛈",
+    71: "🌨", 73: "❄️", 75: "❄️", 77: "❄️",
+    80: "🌦", 81: "🌧", 82: "⛈",
+    85: "🌨", 86: "❄️",
+    95: "⛈", 96: "⛈", 99: "⛈",
 }
 
 def load_json(filename):
@@ -333,25 +336,41 @@ def get_weather_forecast():
 
 def get_weather_hourly(day_index=0, hours_from=None, hours_count=12):
     try:
-        url = f"https://api.weather.yandex.ru/v2/forecast?lat={LAT}&lon={LON}&lang=ru_RU&limit=2&hours=true"
-        req = urllib.request.Request(url, headers={"X-Yandex-API-Key": YANDEX_WEATHER_KEY})
+        url = (
+            f"https://api.open-meteo.com/v1/forecast"
+            f"?latitude={LAT}&longitude={LON}"
+            f"&hourly=temperature_2m,weathercode"
+            f"&timezone=Europe%2FMoscow&forecast_days=2"
+        )
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=10) as r:
             data = json.loads(r.read())
+
         now_moscow = datetime.utcnow() + timedelta(hours=3)
         if hours_from is None:
             hours_from = now_moscow.hour
-        today_hours = data["forecasts"][0].get("hours", [])
-        tomorrow_hours = data["forecasts"][1].get("hours", [])
-        if day_index == 0:
-            source = [h for h in today_hours if int(h["hour"]) >= hours_from] + tomorrow_hours
-            label = "Прогноз на сегодня"
-        else:
-            source = tomorrow_hours
-            label = "Прогноз на завтра"
+
+        today = now_moscow.strftime("%Y-%m-%d")
+        tomorrow = (now_moscow + timedelta(days=1)).strftime("%Y-%m-%d")
+        target_date = today if day_index == 0 else tomorrow
+        label = "Прогноз на сегодня" if day_index == 0 else "Прогноз на завтра"
+
+        times = data["hourly"]["time"]
+        temps = data["hourly"]["temperature_2m"]
+        codes = data["hourly"]["weathercode"]
+
         lines = []
-        for h in source[:hours_count]:
-            emoji = CONDITION_EMOJI.get(h["condition"], "🌡")
-            lines.append(f"{int(h['hour']):02d}:00 {emoji} {h['temp']}°C")
+        for t, temp, code in zip(times, temps, codes):
+            if not t.startswith(target_date):
+                continue
+            hour = int(t[11:13])
+            if day_index == 0 and hour < hours_from:
+                continue
+            emoji = WMO_EMOJI.get(code, "🌡")
+            lines.append(f"{hour:02d}:00 {emoji} {round(temp)}°C")
+            if len(lines) >= hours_count:
+                break
+
         return f"🕐 {label}, Санкт-Петербург:\n\n" + "\n".join(lines)
     except Exception as e:
         return f"🕐 Почасовой прогноз: не удалось получить данные ({e})"
