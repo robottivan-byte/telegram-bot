@@ -4,7 +4,7 @@ import random
 from datetime import datetime, timedelta
 from aiohttp import web
 from telegram import Update, Bot
-from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 REPORT_BOT_TOKEN = os.environ.get("REPORT_BOT_TOKEN", BOT_TOKEN)
@@ -21,6 +21,9 @@ GREETINGS = [
     "Привет-привет, {name}! Как дела? 😄",
 ]
 EMOJIS = ["🔥","❤️","👍","😂","😮","🎉","💯","👏","🤩","😎","🥳","💪"]
+
+# Очередь команд для локального скрипта
+pending_commands = []
 
 def load_last_seen():
     if os.path.exists(LAST_SEEN_FILE):
@@ -51,6 +54,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_last_seen(last_seen)
     await update.message.reply_text(random.choice(EMOJIS))
 
+async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE, period: str):
+    names = {"day": "дневной", "week": "недельный", "month": "месячный"}
+    pending_commands.append(period)
+    await update.message.reply_text(
+        f"✅ Запрос на {names[period]} отчёт принят.\nОтчёт придёт в течение минуты..."
+    )
+
+async def cmd_daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await cmd_report(update, context, "day")
+
+async def cmd_weekly(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await cmd_report(update, context, "week")
+
+async def cmd_monthly(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await cmd_report(update, context, "month")
+
+# --- HTTP endpoints ---
 async def relay_handler(request):
     try:
         data = await request.json()
@@ -66,10 +86,19 @@ async def relay_handler(request):
     await bot.send_message(chat_id=chat_id, text=text, parse_mode="Markdown")
     return web.Response(text="ok")
 
+async def commands_handler(request):
+    """Локальный скрипт забирает команды и очищает очередь"""
+    if request.rel_url.query.get("secret") != RELAY_SECRET:
+        return web.Response(status=403, text="forbidden")
+    result = list(pending_commands)
+    pending_commands.clear()
+    return web.json_response(result)
+
 async def run_web():
     port = int(os.environ.get("PORT", 8080))
     app_web = web.Application()
     app_web.router.add_post("/report", relay_handler)
+    app_web.router.add_get("/commands", commands_handler)
     runner = web.AppRunner(app_web)
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", port)
@@ -82,6 +111,9 @@ if __name__ == "__main__":
     async def main():
         await run_web()
         tg_app = ApplicationBuilder().token(BOT_TOKEN).build()
+        tg_app.add_handler(CommandHandler("daily", cmd_daily))
+        tg_app.add_handler(CommandHandler("weekly", cmd_weekly))
+        tg_app.add_handler(CommandHandler("monthly", cmd_monthly))
         tg_app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, handle_message))
         print("Бот запущен!")
         async with tg_app:
