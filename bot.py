@@ -110,15 +110,23 @@ if __name__ == "__main__":
 
     async def main():
         await run_web()
-        tg_app = ApplicationBuilder().token(BOT_TOKEN).build()
-        tg_app.add_handler(CommandHandler("daily", cmd_daily))
-        tg_app.add_handler(CommandHandler("weekly", cmd_weekly))
-        tg_app.add_handler(CommandHandler("monthly", cmd_monthly))
-        tg_app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, handle_message))
-        print("Бот запущен!")
-        async with tg_app:
-            await tg_app.start()
-            await tg_app.updater.start_polling()
+
+        # Приветственный бот (BOT_TOKEN)
+        greeting_app = ApplicationBuilder().token(BOT_TOKEN).build()
+        greeting_app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, handle_message))
+
+        # Бот для команд отчётов (REPORT_BOT_TOKEN)
+        report_app = ApplicationBuilder().token(REPORT_BOT_TOKEN).build()
+        report_app.add_handler(CommandHandler("daily", cmd_daily))
+        report_app.add_handler(CommandHandler("weekly", cmd_weekly))
+        report_app.add_handler(CommandHandler("monthly", cmd_monthly))
+
+        print("Боты запущены!")
+        async with greeting_app, report_app:
+            await greeting_app.start()
+            await report_app.start()
+            await greeting_app.updater.start_polling()
+            await report_app.updater.start_polling()
             await asyncio.Event().wait()
 
     asyncio.run(main())
