@@ -1,0 +1,30 @@
+name: Send Telegram Report
+on:
+  repository_dispatch:
+    types: [send_report]
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send report to Telegram
+        env:
+          PAYLOAD: ${{ toJson(github.event.client_payload) }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+        run: |
+          python3 - << 'EOF'
+          import json, urllib.request, os
+          token = os.environ["TELEGRAM_TOKEN"]
+          payload = json.loads(os.environ["PAYLOAD"])
+          data = json.dumps({
+              "chat_id": payload["chat_id"],
+              "text": payload["text"],
+              "parse_mode": "Markdown"
+          }).encode()
+          req = urllib.request.Request(
+              f"https://api.telegram.org/bot{token}/sendMessage",
+              data=data, headers={"Content-Type": "application/json"}
+          )
+          resp = urllib.request.urlopen(req)
+          print(json.loads(resp.read()))
+          EOF
