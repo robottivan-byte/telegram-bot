@@ -11,7 +11,6 @@ from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTyp
 from openai import OpenAI
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
-YANDEX_WEATHER_KEY = os.environ.get("YANDEX_WEATHER_KEY")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 FOOTBALL_API_KEY = os.environ.get("FOOTBALL_API_KEY")
 ALLOWED_CHAT_IDS = [-5102540817, -437147591, -5182288388]
@@ -81,14 +80,6 @@ CONTENT = [
     "💬 Если бы можно было улететь прямо сейчас — куда бы вы отправились? ✈️",
     "💬 Что последнее вас по-настоящему рассмешило? 😄",
 ]
-
-CONDITIONS = {
-    "clear": "Ясно", "partly-cloudy": "Малооблачно", "cloudy": "Облачно",
-    "overcast": "Пасмурно", "light-rain": "Небольшой дождь", "rain": "Дождь",
-    "heavy-rain": "Сильный дождь", "snow": "Снег", "light-snow": "Небольшой снег",
-    "snowfall": "Снегопад", "hail": "Град", "thunderstorm": "Гроза",
-    "fog": "Туман", "drizzle": "Морось"
-}
 
 WMO_EMOJI = {
     0: "☀️", 1: "🌤", 2: "⛅", 3: "☁️",
@@ -305,31 +296,48 @@ def get_world_cup_today():
 
 def get_weather():
     try:
-        url = f"https://api.weather.yandex.ru/v2/forecast?lat={LAT}&lon={LON}&lang=ru_RU&limit=1"
-        req = urllib.request.Request(url, headers={"X-Yandex-API-Key": YANDEX_WEATHER_KEY})
+        url = (
+            f"https://api.open-meteo.com/v1/forecast"
+            f"?latitude={LAT}&longitude={LON}"
+            f"&current=temperature_2m,apparent_temperature,weathercode"
+            f"&timezone=Europe%2FMoscow"
+        )
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=10) as r:
             data = json.loads(r.read())
-        fact = data["fact"]
-        desc = CONDITIONS.get(fact["condition"], fact["condition"])
-        return f"🌤 Погода в Санкт-Петербурге: {desc}, {fact['temp']}°C (ощущается как {fact['feels_like']}°C)"
+        cur = data["current"]
+        emoji = WMO_EMOJI.get(cur["weathercode"], "🌡")
+        return (
+            f"{emoji} Погода в Санкт-Петербурге: "
+            f"{round(cur['temperature_2m'])}°C "
+            f"(ощущается как {round(cur['apparent_temperature'])}°C)"
+        )
     except Exception as e:
         return f"🌤 Погода: не удалось получить данные ({e})"
 
 def get_weather_forecast():
     try:
-        url = f"https://api.weather.yandex.ru/v2/forecast?lat={LAT}&lon={LON}&lang=ru_RU&limit=2"
-        req = urllib.request.Request(url, headers={"X-Yandex-API-Key": YANDEX_WEATHER_KEY})
+        url = (
+            f"https://api.open-meteo.com/v1/forecast"
+            f"?latitude={LAT}&longitude={LON}"
+            f"&daily=temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,weathercode"
+            f"&timezone=Europe%2FMoscow&forecast_days=2"
+        )
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=10) as r:
             data = json.loads(r.read())
-        tomorrow = data["forecasts"][1]
-        day = tomorrow["parts"]["day"]
-        night = tomorrow["parts"]["night"]
-        day_desc = CONDITIONS.get(day["condition"], day["condition"])
-        night_desc = CONDITIONS.get(night["condition"], night["condition"])
+        d = data["daily"]
+        date = d["time"][1]
+        code = d["weathercode"][1]
+        t_max = round(d["temperature_2m_max"][1])
+        t_min = round(d["temperature_2m_min"][1])
+        feels_max = round(d["apparent_temperature_max"][1])
+        feels_min = round(d["apparent_temperature_min"][1])
+        emoji = WMO_EMOJI.get(code, "🌡")
         return (
-            f"📅 Прогноз на завтра ({tomorrow['date']}), Санкт-Петербург:\n"
-            f"☀️ День: {day_desc}, {day['temp_avg']}°C (ощущается как {day['feels_like']}°C)\n"
-            f"🌙 Ночь: {night_desc}, {night['temp_avg']}°C (ощущается как {night['feels_like']}°C)"
+            f"📅 Прогноз на завтра ({date}), Санкт-Петербург:\n"
+            f"{emoji} День: {t_max}°C (ощущается как {feels_max}°C)\n"
+            f"🌙 Ночь: {t_min}°C (ощущается как {feels_min}°C)"
         )
     except Exception as e:
         return f"📅 Прогноз: не удалось получить данные ({e})"
