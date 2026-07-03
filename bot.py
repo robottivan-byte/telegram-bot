@@ -751,7 +751,7 @@ if __name__ == "__main__":
     app.job_queue.run_daily(daily_horoscope, time=time(6, 2))   # 09:02 МСК
     app.job_queue.run_daily(evening_forecast, time=time(20, 0)) # 23:00 МСК
     print("Бот Пятница Про Вариант 9 запущен!")
-    app.run_polling(drop_pending_updates=True)import json
+    app.run_polling(drop_pending_updates=True)
 import os
 import re
 import random
