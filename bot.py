@@ -5,7 +5,7 @@ import random
 import asyncio
 import xml.etree.ElementTree as ET
 import urllib.request
-from datetime import datetime, timedelta, time, date
+from datetime import datetime, timedelta, time
 from telegram import Update, ReactionTypeEmoji
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 from openai import OpenAI
@@ -45,21 +45,11 @@ GREETINGS = [
 REACTIONS = ["👍","❤","🔥","🎉","🤩","💯","👏","😁","🏆","⚡","🥰","😱","🤣","💔","😎"]
 
 PLAYER_TITLES = [
-    "🏆 Легенда дня",
-    "⭐ Звезда чата",
-    "👑 Король/Королева дня",
-    "🎯 Снайпер дня",
-    "🔥 Огонь чата",
-    "💎 Бриллиант дня",
-    "🚀 Ракета дня",
-    "🎭 Актёр дня",
-    "🦁 Лев дня",
-    "🧠 Мозг дня",
-    "😎 Красавчик дня",
-    "🌟 Суперзвезда",
-    "💪 Силач дня",
-    "🎪 Шоумен дня",
-    "🏄 Сёрфер волн",
+    "🏆 Легенда дня", "⭐ Звезда чата", "👑 Король/Королева дня",
+    "🎯 Снайпер дня", "🔥 Огонь чата", "💎 Бриллиант дня",
+    "🚀 Ракета дня", "🎭 Актёр дня", "🦁 Лев дня", "🧠 Мозг дня",
+    "😎 Красавчик дня", "🌟 Суперзвезда", "💪 Силач дня",
+    "🎪 Шоумен дня", "🏄 Сёрфер волн",
 ]
 
 POLL_QUESTIONS = [
@@ -109,9 +99,9 @@ JOKES = [
     "Ребёнок отцу: — Правда, что в некоторых странах муж и жена не знакомы до свадьбы?\n— Сынок, так везде. Это потом начинают узнавать друг друга.",
     "— Почему программисты путают Хэллоуин и Рождество?\n— Потому что Oct 31 = Dec 25.",
     "Муж возвращается — дома беспорядок.\nЖена: — Ты спрашивал, что я делаю целый день? Вот — сегодня ничего не делала.\nМуж: — А разница?\n— Не заметна, правда?",
-    "— Дорогой, купи хлеб. И если будут яйца — возьми десяток.\nМуж вернулся с десятью батонами хлеба: — Яйца были.",
-    "— Что общего между мужем и WiFi?\n— Когда он рядом — не замечаешь. Когда исчезает — сразу чувствуешь.",
-    "Человек приходит к психиатру:\n— Доктор, мой брат думает, что он курица.\n— Почему вы его не лечите?\n— Нам нужны яйца.",
+    "— Дорогой, купи хлеб. И если будут яйца — возьми десяток.\nМуж вернулся с десятью батонами: — Яйца были.",
+    "— Что общего между мужем и WiFi?\n— Когда рядом — не замечаешь. Когда исчезает — сразу чувствуешь.",
+    "Человек приходит к психиатру:\n— Доктор, мой брат думает, что он курица.\n— Почему не лечите?\n— Нам нужны яйца.",
     "— Папа, а правда, что деньги не пахнут?\n— Правда, сынок. Именно поэтому их так сложно найти.",
     "Объявление: «Продаю парашют. Б/У. Один раз не раскрылся. Торг уместен».",
     "— Дорогой, я записалась на курсы вождения.\n— Это хорошо.\n— Кстати, где наш кот?\n— Это плохо.",
@@ -272,46 +262,47 @@ def get_events() -> str:
     now_moscow = datetime.utcnow() + timedelta(hours=3)
     today = now_moscow.date()
     year = today.year
+    # (month, day, name, is_nonworking)
     holidays = [
-        (1, 1, "Новый год 🎆"),
-        (1, 7, "Рождество Христово ⛪"),
-        (2, 14, "День святого Валентина 💝"),
-        (2, 23, "День защитника Отечества 🎖"),
-        (3, 8, "Международный женский день 💐"),
-        (4, 1, "День смеха 😂"),
-        (4, 12, "День космонавтики 🚀"),
-        (5, 1, "Праздник весны и труда 🌸"),
-        (5, 9, "День Победы 🎗"),
-        (6, 1, "День защиты детей 👶"),
-        (6, 12, "День России 🇷🇺"),
-        (8, 22, "День Государственного флага РФ 🚩"),
-        (9, 1, "День знаний 📚"),
-        (11, 4, "День народного единства 🤝"),
-        (12, 31, "Новый год (канун) 🎄"),
+        (1,  1,  "Новый год 🎆", True),
+        (1,  7,  "Рождество Христово ⛪", True),
+        (2,  14, "День святого Валентина 💝", False),
+        (2,  23, "День защитника Отечества 🎖", True),
+        (3,  8,  "Международный женский день 💐", True),
+        (4,  1,  "День смеха 😂", False),
+        (4,  12, "День космонавтики 🚀", False),
+        (5,  1,  "Праздник весны и труда 🌸", True),
+        (5,  9,  "День Победы 🎗", True),
+        (6,  1,  "День защиты детей 👶", False),
+        (6,  12, "День России 🇷🇺", True),
+        (8,  22, "День Государственного флага РФ 🚩", False),
+        (9,  1,  "День знаний 📚", False),
+        (11, 4,  "День народного единства 🤝", True),
+        (12, 31, "Новый год (канун) 🎄", False),
     ]
     upcoming = []
-    for month, day, name in holidays:
+    for month, day, name, is_nonworking in holidays:
         try:
             event_date = datetime(year, month, day).date()
             if event_date < today:
                 event_date = datetime(year + 1, month, day).date()
             delta = (event_date - today).days
-            if 0 <= delta <= 14:
-                upcoming.append((delta, event_date, name))
+            upcoming.append((delta, event_date, name, is_nonworking))
         except Exception:
             pass
     upcoming.sort()
-    if not upcoming:
-        return "🗓 Ближайшие 2 недели: праздников нет"
     lines = ["🗓 Ближайшие праздники:\n"]
-    for delta, evt_date, name in upcoming:
+    for delta, evt_date, name, is_nonworking in upcoming[:5]:
         if delta == 0:
             when = "Сегодня!"
         elif delta == 1:
             when = "Завтра"
-        else:
+        elif delta <= 14:
             when = f"Через {delta} дн. ({evt_date.strftime('%d.%m')})"
-        lines.append(f"{when} — {name}")
+        else:
+            when = f"{evt_date.strftime('%d.%m')} (через {delta} дн.)"
+        marker = " 🔴 выходной" if is_nonworking else ""
+        lines.append(f"{when} — {name}{marker}")
     return "\n".join(lines)
 
 def get_horoscope_one(sign: str) -> str:
@@ -328,8 +319,7 @@ def get_horoscope_one(sign: str) -> str:
             messages=[{"role": "user", "content": f"Напиши гороскоп на {date_str} для знака {sign_name}. 3-4 предложения, позитивно, конкретно, по-русски. Без заголовка."}],
             max_tokens=200
         )
-        text = response.choices[0].message.content
-        return f"{sign_name} — гороскоп на {date_str}:\n{text}"
+        return f"{sign_name} — гороскоп на {date_str}:\n{response.choices[0].message.content}"
     except Exception as e:
         return f"🔮 Гороскоп: ошибка ({e})"
 
@@ -344,18 +334,14 @@ def get_horoscope_all() -> str:
             messages=[{"role": "user", "content": f"Напиши краткий гороскоп на {date_str} для каждого из 12 знаков зодиака: {signs_list}. Для каждого знака 1-2 предложения. Формат: эмодзи знак — текст. По-русски, позитивно."}],
             max_tokens=800
         )
-        text = response.choices[0].message.content
-        return f"🔮 Гороскоп на {date_str}:\n\n{text}"
+        return f"🔮 Гороскоп на {date_str}:\n\n{response.choices[0].message.content}"
     except Exception as e:
         return f"🔮 Гороскоп: ошибка ({e})"
 
 def football_request(url):
     if not FOOTBALL_API_KEY:
         return None
-    req = urllib.request.Request(
-        url,
-        headers={"X-Auth-Token": FOOTBALL_API_KEY, "User-Agent": "Mozilla/5.0"}
-    )
+    req = urllib.request.Request(url, headers={"X-Auth-Token": FOOTBALL_API_KEY, "User-Agent": "Mozilla/5.0"})
     with urllib.request.urlopen(req, timeout=15) as r:
         return json.loads(r.read())
 
@@ -385,9 +371,8 @@ def get_world_cup_results():
                 by_date[moscow_date] = []
             by_date[moscow_date].append(f"  {home} {hg}:{ag} {away}")
         all_dates = sorted(by_date.keys(), key=lambda d: datetime.strptime(d + ".2026", "%d.%m.%Y"))
-        recent_dates = all_dates[-3:]
         lines = ["⚽ ЧМ 2026 — последние результаты:\n"]
-        for date_key in recent_dates:
+        for date_key in all_dates[-3:]:
             lines.append(f"📅 {date_key}")
             lines.extend(by_date[date_key])
             lines.append("")
@@ -406,10 +391,6 @@ def get_world_cup_results():
             lines.extend(today_matches)
         return "\n".join(lines)
     except urllib.error.HTTPError as e:
-        if e.code == 403:
-            return "⚽ ЧМ 2026: нет доступа — проверь API ключ"
-        if e.code == 404:
-            return "⚽ ЧМ 2026: турнир ещё не добавлен в API"
         return f"⚽ ЧМ 2026: ошибка {e.code}"
     except Exception as e:
         return f"⚽ ЧМ 2026: не удалось получить данные ({e})"
@@ -433,11 +414,8 @@ def get_world_cup_today():
                     away = m["awayTeam"].get("shortName") or m["awayTeam"].get("name", "?")
                     score = m["score"]["fullTime"]
                     today_finished.append(f"  {home} {score['home']}:{score['away']} {away}")
-        if today_finished:
-            lines.append(f"⚽ ЧМ 2026 — результаты за {now_moscow.strftime('%d.%m')}:")
-            lines.extend(today_finished)
-        else:
-            lines.append("⚽ ЧМ 2026: сегодня матчей не было")
+        lines.append(f"⚽ ЧМ 2026 — результаты за {now_moscow.strftime('%d.%m')}:" if today_finished else "⚽ ЧМ 2026: сегодня матчей не было")
+        lines.extend(today_finished)
         data2 = football_request("https://api.football-data.org/v4/competitions/WC/matches?status=SCHEDULED")
         tomorrow_matches = []
         if data2:
@@ -453,92 +431,60 @@ def get_world_cup_today():
             lines.extend(tomorrow_matches)
         return "\n".join(lines)
     except urllib.error.HTTPError as e:
-        if e.code == 403:
-            return "⚽ ЧМ 2026: нет доступа — проверь API ключ"
-        if e.code == 404:
-            return "⚽ ЧМ 2026: турнир ещё не добавлен в API"
         return f"⚽ ЧМ 2026: ошибка {e.code}"
     except Exception as e:
         return f"⚽ ЧМ 2026: не удалось получить данные ({e})"
 
 def get_weather():
     try:
-        url = (
-            f"https://api.open-meteo.com/v1/forecast"
-            f"?latitude={LAT}&longitude={LON}"
-            f"&current=temperature_2m,apparent_temperature,weathercode"
-            f"&timezone=Europe%2FMoscow"
-        )
+        url = (f"https://api.open-meteo.com/v1/forecast?latitude={LAT}&longitude={LON}"
+               f"&current=temperature_2m,apparent_temperature,weathercode&timezone=Europe%2FMoscow")
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=10) as r:
             data = json.loads(r.read())
         cur = data["current"]
         emoji = WMO_EMOJI.get(cur["weathercode"], "🌡")
-        return (
-            f"{emoji} Погода в Санкт-Петербурге: "
-            f"{round(cur['temperature_2m'])}°C "
-            f"(ощущается как {round(cur['apparent_temperature'])}°C)"
-        )
+        return (f"{emoji} Погода в Санкт-Петербурге: {round(cur['temperature_2m'])}°C "
+                f"(ощущается как {round(cur['apparent_temperature'])}°C)")
     except Exception as e:
         return f"🌤 Погода: не удалось получить данные ({e})"
 
 def get_weather_forecast():
     try:
-        url = (
-            f"https://api.open-meteo.com/v1/forecast"
-            f"?latitude={LAT}&longitude={LON}"
-            f"&daily=temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,weathercode"
-            f"&timezone=Europe%2FMoscow&forecast_days=2"
-        )
+        url = (f"https://api.open-meteo.com/v1/forecast?latitude={LAT}&longitude={LON}"
+               f"&daily=temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,weathercode"
+               f"&timezone=Europe%2FMoscow&forecast_days=2")
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=10) as r:
             data = json.loads(r.read())
         d = data["daily"]
-        date_str = d["time"][1]
-        code = d["weathercode"][1]
-        t_max = round(d["temperature_2m_max"][1])
-        t_min = round(d["temperature_2m_min"][1])
-        feels_max = round(d["apparent_temperature_max"][1])
-        feels_min = round(d["apparent_temperature_min"][1])
-        emoji = WMO_EMOJI.get(code, "🌡")
-        return (
-            f"📅 Прогноз на завтра ({date_str}), Санкт-Петербург:\n"
-            f"{emoji} День: {t_max}°C (ощущается как {feels_max}°C)\n"
-            f"🌙 Ночь: {t_min}°C (ощущается как {feels_min}°C)"
-        )
+        emoji = WMO_EMOJI.get(d["weathercode"][1], "🌡")
+        return (f"📅 Прогноз на завтра ({d['time'][1]}), Санкт-Петербург:\n"
+                f"{emoji} День: {round(d['temperature_2m_max'][1])}°C (ощущается как {round(d['apparent_temperature_max'][1])}°C)\n"
+                f"🌙 Ночь: {round(d['temperature_2m_min'][1])}°C (ощущается как {round(d['apparent_temperature_min'][1])}°C)")
     except Exception as e:
         return f"📅 Прогноз: не удалось получить данные ({e})"
 
 def get_weather_hourly(day_index=0, hours_from=None, hours_count=12):
     try:
-        url = (
-            f"https://api.open-meteo.com/v1/forecast"
-            f"?latitude={LAT}&longitude={LON}"
-            f"&hourly=temperature_2m,weathercode"
-            f"&timezone=Europe%2FMoscow&forecast_days=2"
-        )
+        url = (f"https://api.open-meteo.com/v1/forecast?latitude={LAT}&longitude={LON}"
+               f"&hourly=temperature_2m,weathercode&timezone=Europe%2FMoscow&forecast_days=2")
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=10) as r:
             data = json.loads(r.read())
         now_moscow = datetime.utcnow() + timedelta(hours=3)
         if hours_from is None:
             hours_from = now_moscow.hour
-        today = now_moscow.strftime("%Y-%m-%d")
-        tomorrow = (now_moscow + timedelta(days=1)).strftime("%Y-%m-%d")
-        target_date = today if day_index == 0 else tomorrow
+        target_date = now_moscow.strftime("%Y-%m-%d") if day_index == 0 else (now_moscow + timedelta(days=1)).strftime("%Y-%m-%d")
         label = "Прогноз на сегодня" if day_index == 0 else "Прогноз на завтра"
-        times = data["hourly"]["time"]
-        temps = data["hourly"]["temperature_2m"]
-        codes = data["hourly"]["weathercode"]
         lines = []
-        for t, temp, code in zip(times, temps, codes):
+        for t, temp, code in zip(data["hourly"]["time"], data["hourly"]["temperature_2m"], data["hourly"]["weathercode"]):
             if not t.startswith(target_date):
                 continue
             hour = int(t[11:13])
             if day_index == 0 and hour < hours_from:
                 continue
-            emoji = WMO_EMOJI.get(code, "🌡")
-            lines.append(f"{hour:02d}:00 {emoji} {round(temp)}°C")
+            lines.append(f"{hour:02d}:00 {WMO_EMOJI.get(code, '🌡')} {round(temp)}°C")
             if len(lines) >= hours_count:
                 break
         return f"🕐 {label}, Санкт-Петербург:\n\n" + "\n".join(lines)
@@ -547,43 +493,29 @@ def get_weather_hourly(day_index=0, hours_from=None, hours_count=12):
 
 def get_currency():
     try:
-        url = "https://www.cbr.ru/scripts/XML_daily.asp"
-        with urllib.request.urlopen(url, timeout=10) as r:
-            tree = ET.parse(r)
-        root = tree.getroot()
+        with urllib.request.urlopen("https://www.cbr.ru/scripts/XML_daily.asp", timeout=10) as r:
+            root = ET.parse(r).getroot()
         rates = {}
-        for valute in root.findall("Valute"):
-            char_code = valute.find("CharCode").text
-            value = float(valute.find("Value").text.replace(",", "."))
-            nominal = int(valute.find("Nominal").text)
-            if char_code in ("USD", "EUR", "CNY"):
-                rates[char_code] = round(value / nominal, 2)
-        return (
-            f"💵 Курс ЦБ:\n"
-            f"  USD — {rates.get('USD', '?')}₽\n"
-            f"  EUR — {rates.get('EUR', '?')}₽\n"
-            f"  CNY — {rates.get('CNY', '?')}₽"
-        )
+        for v in root.findall("Valute"):
+            code = v.find("CharCode").text
+            if code in ("USD", "EUR", "CNY"):
+                rates[code] = round(float(v.find("Value").text.replace(",", ".")) / int(v.find("Nominal").text), 2)
+        return f"💵 Курс ЦБ:\n  USD — {rates.get('USD','?')}₽\n  EUR — {rates.get('EUR','?')}₽\n  CNY — {rates.get('CNY','?')}₽"
     except:
         return "💵 Курс валют: не удалось получить данные"
 
 def get_bitcoin():
     try:
-        url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=rub,usd"
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        req = urllib.request.Request("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=rub,usd", headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=10) as r:
-            data = json.loads(r.read())
-        btc = data["bitcoin"]
-        rub = f"{btc['rub']:,.0f}".replace(",", " ")
-        usd = f"{btc['usd']:,.0f}".replace(",", " ")
-        return f"₿ Bitcoin: {usd}$ / {rub}₽"
+            btc = json.loads(r.read())["bitcoin"]
+        return f"₿ Bitcoin: {btc['usd']:,.0f}$ / {btc['rub']:,.0f}₽".replace(",", " ")
     except Exception as e:
         return f"₿ Bitcoin: не удалось получить данные ({e})"
 
 def get_moex():
     try:
-        url = "https://iss.moex.com/iss/engines/stock/markets/index/boards/SNDX/securities/IMOEX.json?iss.meta=off"
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        req = urllib.request.Request("https://iss.moex.com/iss/engines/stock/markets/index/boards/SNDX/securities/IMOEX.json?iss.meta=off", headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=10) as r:
             data = json.loads(r.read())
         cols = data["marketdata"]["columns"]
@@ -591,49 +523,36 @@ def get_moex():
         if not rows:
             return "📊 ММВБ: нет данных"
         last = rows[0][cols.index("CURRENTVALUE")]
-        if last is None:
-            return "📊 ММВБ: нет данных (рынок закрыт)"
-        return f"📊 ММВБ (IMOEX): {last:,.2f}"
+        return f"📊 ММВБ (IMOEX): {last:,.2f}" if last else "📊 ММВБ: нет данных (рынок закрыт)"
     except Exception as e:
         return f"📊 ММВБ: не удалось получить данные ({e})"
 
 def get_nasdaq():
     try:
-        url = "https://query1.finance.yahoo.com/v8/finance/chart/%5EIXIC?interval=1d&range=1d"
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        req = urllib.request.Request("https://query1.finance.yahoo.com/v8/finance/chart/%5EIXIC?interval=1d&range=1d", headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=10) as r:
-            data = json.loads(r.read())
-        meta = data["chart"]["result"][0]["meta"]
+            meta = json.loads(r.read())["chart"]["result"][0]["meta"]
         price = meta.get("regularMarketPrice") or meta.get("previousClose")
         change_pct = ((price - meta["previousClose"]) / meta["previousClose"] * 100) if meta.get("previousClose") else 0
-        arrow = "📈" if change_pct >= 0 else "📉"
-        return f"{arrow} NASDAQ: {price:,.2f} ({change_pct:+.2f}%)"
+        return f"{'📈' if change_pct >= 0 else '📉'} NASDAQ: {price:,.2f} ({change_pct:+.2f}%)"
     except Exception as e:
         return f"📈 NASDAQ: не удалось получить данные ({e})"
 
 def get_news():
     try:
-        url = "https://lenta.ru/rss/news"
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        req = urllib.request.Request("https://lenta.ru/rss/news", headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=10) as r:
-            tree = ET.parse(r)
-        root = tree.getroot()
-        items = root.findall(".//item")[:3]
-        news = "\n".join(f"• {item.find('title').text}" for item in items)
-        return f"📰 Новости:\n{news}"
+            items = ET.parse(r).getroot().findall(".//item")[:3]
+        return "📰 Новости:\n" + "\n".join(f"• {i.find('title').text}" for i in items)
     except:
         return "📰 Новости: не удалось получить данные"
 
 def get_science_news():
     try:
-        url = "https://ria.ru/export/rss2/science/index.xml"
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        req = urllib.request.Request("https://ria.ru/export/rss2/science/index.xml", headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=10) as r:
-            tree = ET.parse(r)
-        root = tree.getroot()
-        items = root.findall(".//item")[:3]
-        news = "\n".join(f"• {item.find('title').text}" for item in items)
-        return f"🔬 Наука:\n{news}"
+            items = ET.parse(r).getroot().findall(".//item")[:3]
+        return "🔬 Наука:\n" + "\n".join(f"• {i.find('title').text}" for i in items)
     except Exception as e:
         return f"🔬 Наука: не удалось получить данные ({e})"
 
@@ -683,9 +602,8 @@ def parse_reminder(text: str, chat_id: str):
     match = re.search(r'напомнить\s+"(\d{1,2}:\d{2})"\s+текст\s+"([^"]+)"', text, re.IGNORECASE)
     if not match:
         return None
-    time_str = match.group(1)
+    hour, minute = map(int, match.group(1).split(":"))
     reminder_text = match.group(2).strip()
-    hour, minute = map(int, time_str.split(":"))
     now_moscow = datetime.utcnow() + timedelta(hours=3)
     event_time = now_moscow.replace(hour=hour, minute=minute, second=0, microsecond=0)
     if event_time <= now_moscow:
@@ -695,21 +613,10 @@ def parse_reminder(text: str, chat_id: str):
         notify_at = event_time - timedelta(minutes=minutes_before)
         if notify_at > now_moscow:
             label = f"за {minutes_before} мин" if minutes_before > 0 else "в момент события"
-            notifications.append({
-                "minutes_before": minutes_before,
-                "label": label,
-                "notify_at": notify_at.isoformat(),
-                "notified": False
-            })
+            notifications.append({"minutes_before": minutes_before, "label": label, "notify_at": notify_at.isoformat(), "notified": False})
     if not notifications:
         return None
-    return {
-        "chat_id": chat_id,
-        "text": reminder_text,
-        "event_time": event_time.strftime("%H:%M"),
-        "event_dt": event_time.isoformat(),
-        "notifications": notifications
-    }
+    return {"chat_id": chat_id, "text": reminder_text, "event_time": event_time.strftime("%H:%M"), "event_dt": event_time.isoformat(), "notifications": notifications}
 
 def save_reminder(reminder: dict):
     reminders = load_json(REMINDERS_FILE)
@@ -722,35 +629,20 @@ def save_reminder(reminder: dict):
 def parse_poll(text: str):
     text = re.sub(r'@\w+', '', text)
     text = re.sub(r'голосование\s*', '', text, flags=re.IGNORECASE).strip()
-    options = re.split(r'\s+или\s+', text, flags=re.IGNORECASE)
-    options = [o.strip() for o in options if o.strip()]
+    options = [o.strip() for o in re.split(r'\s+или\s+', text, flags=re.IGNORECASE) if o.strip()]
     return options if len(options) >= 2 else None
 
 async def morning_digest(context: ContextTypes.DEFAULT_TYPE):
     now_moscow = datetime.utcnow() + timedelta(hours=3)
-    weather = get_weather()
-    hourly = get_weather_hourly(day_index=0, hours_from=9, hours_count=14)
-    currency = get_currency()
-    bitcoin = get_bitcoin()
-    moex = get_moex()
-    nasdaq = get_nasdaq()
-    news = get_news()
-    science = get_science_news()
-    events = get_events()
-    await asyncio.sleep(2)
-    wc = get_world_cup_results()
-
     text1 = (
         f"☀️ Доброе утро! Сводка на {now_moscow.strftime('%d.%m.%Y')}:\n\n"
-        f"{weather}\n\n{hourly}\n\n"
-        f"{currency}\n\n"
-        f"{bitcoin}\n{moex}\n{nasdaq}\n\n"
-        f"{news}\n\n"
-        f"{science}\n\n"
-        f"{events}"
+        f"{get_weather()}\n\n{get_weather_hourly(day_index=0, hours_from=9, hours_count=14)}\n\n"
+        f"{get_currency()}\n\n"
+        f"{get_bitcoin()}\n{get_moex()}\n{get_nasdaq()}\n\n"
+        f"{get_news()}\n\n{get_science_news()}\n\n{get_events()}"
     )
-    text2 = wc
-
+    await asyncio.sleep(2)
+    text2 = get_world_cup_results()
     for chat_id in ALLOWED_CHAT_IDS:
         try:
             await context.bot.send_message(chat_id=chat_id, text=text1)
@@ -776,12 +668,10 @@ async def player_of_day(context: ContextTypes.DEFAULT_TYPE):
         members = chat_members.get(str(chat_id), {})
         if not members:
             continue
-        user_id = random.choice(list(members.keys()))
-        name = members[user_id]
+        name = members[random.choice(list(members.keys()))]
         title = random.choice(PLAYER_TITLES)
-        text = f"{title}\n\nСегодня им становится — {name}! 🎉\n\nПоздравляем, удачного дня!"
         try:
-            await context.bot.send_message(chat_id=chat_id, text=text)
+            await context.bot.send_message(chat_id=chat_id, text=f"{title}\n\nСегодня им становится — {name}! 🎉\n\nПоздравляем, удачного дня!")
         except Exception as e:
             print(f"[player_of_day] → {chat_id}: {e}")
 
@@ -793,20 +683,14 @@ async def daily_poll_job(context: ContextTypes.DEFAULT_TYPE):
     save_json(CONTENT_INDEX_FILE, content_index)
     for chat_id in ALLOWED_CHAT_IDS:
         try:
-            await context.bot.send_poll(
-                chat_id=chat_id,
-                question=f"🎯 Вопрос дня: {question}",
-                options=options,
-                is_anonymous=False
-            )
+            await context.bot.send_poll(chat_id=chat_id, question=f"🎯 Вопрос дня: {question}", options=options, is_anonymous=False)
         except Exception as e:
             print(f"[daily_poll] → {chat_id}: {e}")
 
 async def evening_forecast(context: ContextTypes.DEFAULT_TYPE):
     forecast = get_weather_hourly(day_index=1, hours_from=0, hours_count=24)
     await asyncio.sleep(2)
-    wc = get_world_cup_today()
-    text = f"🌙 Вечерняя сводка:\n\n{forecast}\n\n{wc}"
+    text = f"🌙 Вечерняя сводка:\n\n{forecast}\n\n{get_world_cup_today()}"
     for chat_id in ALLOWED_CHAT_IDS:
         try:
             await context.bot.send_message(chat_id=chat_id, text=text)
@@ -815,8 +699,7 @@ async def evening_forecast(context: ContextTypes.DEFAULT_TYPE):
 
 async def check_inactive_chats(context: ContextTypes.DEFAULT_TYPE):
     now = datetime.utcnow()
-    moscow_hour = (now.hour + 3) % 24
-    if moscow_hour < 9 or moscow_hour >= 23:
+    if (now.hour + 3) % 24 < 9 or (now.hour + 3) % 24 >= 23:
         return
     chat_activity = load_json(LAST_CHAT_ACTIVITY_FILE)
     content_index = load_json(CONTENT_INDEX_FILE)
@@ -842,18 +725,13 @@ async def check_reminders(context: ContextTypes.DEFAULT_TYPE):
     for chat_id, chat_reminders in reminders.items():
         for reminder in chat_reminders:
             for notif in reminder.get("notifications", []):
-                if not notif["notified"]:
-                    notify_at = datetime.fromisoformat(notif["notify_at"])
-                    if now_moscow >= notify_at:
-                        try:
-                            await context.bot.send_message(
-                                chat_id=int(chat_id),
-                                text=f"🔔 Напоминание ({notif['label']}):\n{reminder['text']} в {reminder['event_time']}"
-                            )
-                        except Exception as e:
-                            print(f"[check_reminders] → {chat_id}: {e}")
-                        notif["notified"] = True
-                        changed = True
+                if not notif["notified"] and now_moscow >= datetime.fromisoformat(notif["notify_at"]):
+                    try:
+                        await context.bot.send_message(chat_id=int(chat_id), text=f"🔔 Напоминание ({notif['label']}):\n{reminder['text']} в {reminder['event_time']}")
+                    except Exception as e:
+                        print(f"[check_reminders] → {chat_id}: {e}")
+                    notif["notified"] = True
+                    changed = True
     if changed:
         save_json(REMINDERS_FILE, reminders)
 
@@ -876,10 +754,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         last_time = get_last_seen_time(last_seen[user_id])
         delta = now - last_time
         if delta >= timedelta(hours=AWAY_THRESHOLD_HOURS):
-            time_str = format_duration(delta)
-            greeting = GREETINGS[user.id % len(GREETINGS)].format(name=user_name, time=time_str)
+            greeting = GREETINGS[user.id % len(GREETINGS)].format(name=user_name, time=format_duration(delta))
             await msg.reply_text(greeting)
-
     last_seen[user_id] = {"last_seen": now.isoformat(), "name": user_name}
     save_json(LAST_SEEN_FILE, last_seen)
 
@@ -933,8 +809,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if len(parts) >= 2:
                 a, b = int(parts[0]), int(parts[1])
                 mn, mx = min(a, b), max(a, b)
-                result = random.randint(mn, mx)
-                await msg.reply_text(f"🎲 Случайное число от {mn} до {mx}: {result}")
+                await msg.reply_text(f"🎲 Случайное число от {mn} до {mx}: {random.randint(mn, mx)}")
             else:
                 await msg.reply_text("Напиши так: @Fuckbook1Bot рандом 1 100")
         elif re.search(r'^статистика$', question, re.IGNORECASE):
@@ -953,35 +828,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reminder = parse_reminder(question, chat_id)
             if reminder:
                 save_reminder(reminder)
-                notif_times = "\n".join([
-                    f"  • {datetime.fromisoformat(n['notify_at']).strftime('%H:%M')} — {n['label']}"
-                    for n in reminder["notifications"]
-                ])
-                await msg.reply_text(
-                    f"✅ Напоминание создано!\n"
-                    f"📝 {reminder['text']}\n"
-                    f"🕐 Событие в {reminder['event_time']}\n"
-                    f"🔔 Уведомлю:\n{notif_times}"
-                )
+                notif_times = "\n".join([f"  • {datetime.fromisoformat(n['notify_at']).strftime('%H:%M')} — {n['label']}" for n in reminder["notifications"]])
+                await msg.reply_text(f"✅ Напоминание создано!\n📝 {reminder['text']}\n🕐 Событие в {reminder['event_time']}\n🔔 Уведомлю:\n{notif_times}")
             else:
-                await msg.reply_text(
-                    '❌ Не понял формат или время уже прошло.\n\n'
-                    'Используй:\n@Fuckbook1Bot напомнить "19:30" текст "баня"'
-                )
+                await msg.reply_text('❌ Не понял формат.\n\nИспользуй:\n@Fuckbook1Bot напомнить "19:30" текст "баня"')
         elif re.search(r'голосование', question, re.IGNORECASE):
             options = parse_poll(question)
             if options and len(options) >= 2:
-                await context.bot.send_poll(
-                    chat_id=update.effective_chat.id,
-                    question="Голосуем! 🗳",
-                    options=options[:10],
-                    is_anonymous=False
-                )
+                await context.bot.send_poll(chat_id=update.effective_chat.id, question="Голосуем! 🗳", options=options[:10], is_anonymous=False)
             else:
                 await msg.reply_text("Напиши так: @Fuckbook1Bot голосование баня или кино или ресторан")
         else:
-            answer = ask_gpt(question, chat_id)
-            await msg.reply_text(answer)
+            await msg.reply_text(ask_gpt(question, chat_id))
 
 if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
@@ -993,5 +851,5 @@ if __name__ == "__main__":
     app.job_queue.run_daily(player_of_day, time=time(6, 3))      # 09:03 МСК
     app.job_queue.run_daily(daily_poll_job, time=time(8, 0))     # 11:00 МСК
     app.job_queue.run_daily(evening_forecast, time=time(20, 0))  # 23:00 МСК
-    print("Бот Пятница Про Золотая сборка v9.5 запущен!")
+    print("Бот Пятница Про Золотая сборка v9.6 запущен!")
     app.run_polling(drop_pending_updates=True)
