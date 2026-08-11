@@ -3,6 +3,7 @@ import os
 import re
 import random
 import asyncio
+import html
 import xml.etree.ElementTree as ET
 import urllib.request
 from datetime import datetime, timedelta, time
@@ -399,14 +400,35 @@ def get_nasdaq():
     except Exception as e:
         return f"📈 NASDAQ: не удалось получить данные ({e})"
 
+def _parse_rss_items(url, count=5):
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=10) as r:
+        root = ET.parse(r).getroot()
+    result = []
+    for item in root.findall(".//item")[:count]:
+        title_el = item.find("title")
+        link_el = item.find("link")
+        guid_el = item.find("guid")
+        title = title_el.text.strip() if title_el is not None and title_el.text else None
+        link = None
+        if link_el is not None and link_el.text and link_el.text.strip().startswith("http"):
+            link = link_el.text.strip()
+        elif guid_el is not None and guid_el.text and guid_el.text.strip().startswith("http"):
+            link = guid_el.text.strip()
+        if title:
+            result.append((title, link))
+    return result
+
 def get_news():
     try:
-        req = urllib.request.Request("https://lenta.ru/rss/news", headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=10) as r:
-            items = ET.parse(r).getroot().findall(".//item")[:3]
-        return "📰 Новости:\n" + "\n".join(f"• {i.find('title').text}" for i in items)
-    except:
-        return "📰 Новости: не удалось получить данные"
+        items = _parse_rss_items("https://lenta.ru/rss/news", 5)
+        lines = ["📰 <b>Новости:</b>"]
+        for title, link in items:
+            t = html.escape(title)
+            lines.append(f'• <a href="{link}">{t}</a>' if link else f"• {t}")
+        return "\n".join(lines)
+    except Exception as e:
+        return f"📰 Новости: не удалось получить данные ({e})"
 
 def get_science_news():
     sources = [
@@ -415,12 +437,13 @@ def get_science_news():
     ]
     for url in sources:
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            with urllib.request.urlopen(req, timeout=10) as r:
-                items = ET.parse(r).getroot().findall(".//item")[:3]
-            titles = [i.find("title").text for i in items if i.find("title") is not None]
-            if titles:
-                return "🔬 Наука:\n" + "\n".join(f"• {t}" for t in titles)
+            items = _parse_rss_items(url, 4)
+            if items:
+                lines = ["🔬 <b>Наука:</b>"]
+                for title, link in items:
+                    t = html.escape(title)
+                    lines.append(f'• <a href="{link}">{t}</a>' if link else f"• {t}")
+                return "\n".join(lines)
         except Exception:
             continue
     return "🔬 Наука: не удалось получить данные"
@@ -435,8 +458,8 @@ def get_commands_text():
         "₿ биткоин — цена Bitcoin\n"
         "📊 ммвб — индекс Мосбиржи\n"
         "📊 nasdaq — индекс NASDAQ\n"
-        "📰 новости — топ новости\n"
-        "🔬 наука — новости науки\n"
+        "📰 новости — топ новости со ссылками\n"
+        "🔬 наука — новости науки со ссылками\n"
         "🗓 события — ближайшие праздники\n"
         "😂 анекдот — случайный анекдот\n"
         "🎲 рандом 1 100 — случайное число\n"
@@ -505,13 +528,20 @@ async def morning_digest(context: ContextTypes.DEFAULT_TYPE):
         f"{get_weather()}\n\n{get_weather_hourly(day_index=0, hours_from=9, hours_count=14)}\n\n"
         f"{get_currency()}\n\n"
         f"{get_bitcoin()}\n{get_moex()}\n{get_nasdaq()}\n\n"
-        f"{get_news()}\n\n{get_science_news()}\n\n{get_events()}"
+        f"{get_events()}"
     )
+    text2 = get_news() + "\n\n" + get_science_news()
     for chat_id in ALLOWED_CHAT_IDS:
         try:
             await context.bot.send_message(chat_id=chat_id, text=text1)
         except Exception as e:
-            print(f"[morning_digest] → {chat_id}: {e}")
+            print(f"[morning_digest] text1 → {chat_id}: {e}")
+        await asyncio.sleep(1)
+        try:
+            await context.bot.send_message(chat_id=chat_id, text=text2, parse_mode="HTML",
+                                           disable_web_page_preview=True)
+        except Exception as e:
+            print(f"[morning_digest] text2 → {chat_id}: {e}")
 
 async def player_of_day(context: ContextTypes.DEFAULT_TYPE):
     chat_members = load_json(CHAT_MEMBERS_FILE)
@@ -646,9 +676,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif re.search(r'^nasdaq$|^насдак$', question, re.IGNORECASE):
             await msg.reply_text(get_nasdaq())
         elif re.search(r'^новости$', question, re.IGNORECASE):
-            await msg.reply_text(get_news())
+            await msg.reply_text(get_news(), parse_mode="HTML", disable_web_page_preview=True)
         elif re.search(r'^наука$', question, re.IGNORECASE):
-            await msg.reply_text(get_science_news())
+            await msg.reply_text(get_science_news(), parse_mode="HTML", disable_web_page_preview=True)
         elif re.search(r'^события$|^праздники$', question, re.IGNORECASE):
             await msg.reply_text(get_events())
         elif re.search(r'^анекдот$', question, re.IGNORECASE):
@@ -692,5 +722,5 @@ if __name__ == "__main__":
     app.job_queue.run_daily(player_of_day, time=time(6, 3))      # 09:03 МСК
     app.job_queue.run_daily(daily_poll_job, time=time(8, 0))     # 11:00 МСК
     app.job_queue.run_daily(evening_forecast, time=time(20, 0))  # 23:00 МСК
-    print("Бот Пятница Про v9.8 запущен!")
+    print("Бот Пятница Про v9.9 запущен!")
     app.run_polling(drop_pending_updates=True)
