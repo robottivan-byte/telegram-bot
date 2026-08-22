@@ -16,7 +16,6 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 ALLOWED_CHAT_IDS = [-5102540817, -437147591, -5182288388]
 BOT_USERNAME = "Fuckbook1Bot"
 AWAY_THRESHOLD_HOURS = 3
-INACTIVE_HOURS = 3
 HISTORY_LIMIT = 50
 LAST_SEEN_FILE = "last_seen.json"
 LAST_CHAT_ACTIVITY_FILE = "last_chat_activity.json"
@@ -80,8 +79,6 @@ JOKES = [
     "Сантехник: — Починю трубу за 5000 рублей.\n— Я меньше зарабатываю как хирург!\n— Я тоже, когда был хирургом.",
     "— Вовочка, сколько будет 7×8?\n— 56!\n— Как так быстро?\n— Заранее выучил ответ на самый страшный вопрос.",
     "Оптимист: стакан наполовину полон.\nПессимист: наполовину пуст.\nИнженер: стакан в два раза больше, чем нужно.",
-    "— Ты что, снова за компьютером в 3 ночи?\n— Нет, сплю.\n— Но ты же отвечаешь!\n— Я отвечаю во сне. Это нормально.",
-    "— Почему слон такой большой?\n— Потому что маленький слон много ел.\n— А почему много ел?\n— Потому что он большой.",
     "IT-шник умирает и попадает в ад. Везде WiFi, кофе, кондиционеры. Через неделю Дьявол: «Ошибка, тебе в рай». IT-шник: «Нет уж, у вас тут DevOps настроен».",
     "— Дорогая, я разбила твою любимую кружку.\n— Как?!\n— Я ударила ею твою вторую любимую кружку.",
     "Врач: — У вас две новости: хорошая и плохая.\n— Начните с хорошей.\n— Вам осталось жить 24 часа.\n— А плохая?\n— Я должен был сказать вчера.",
@@ -89,79 +86,12 @@ JOKES = [
     "— Доктор, мне кажется, что я невидимка.\n— Следующий!",
     "Начальник: — Вы опоздали третий раз на этой неделе. Знаете, что это значит?\nСотрудник: — Что сегодня среда?",
     "— Сколько психологов нужно, чтобы вкрутить лампочку?\n— Один, но лампочка должна сама этого захотеть.",
-    "Ребёнок отцу: — Правда, что в некоторых странах муж и жена не знакомы до свадьбы?\n— Сынок, так везде. Это потом начинают узнавать друг друга.",
-    "— Почему программисты путают Хэллоуин и Рождество?\n— Потому что Oct 31 = Dec 25.",
     "Муж возвращается — дома беспорядок.\nЖена: — Ты спрашивал, что я делаю целый день? Вот — сегодня ничего не делала.\nМуж: — А разница?\n— Не заметна, правда?",
     "— Дорогой, купи хлеб. И если будут яйца — возьми десяток.\nМуж вернулся с десятью батонами: — Яйца были.",
     "— Что общего между мужем и WiFi?\n— Когда рядом — не замечаешь. Когда исчезает — сразу чувствуешь.",
-    "Человек приходит к психиатру:\n— Доктор, мой брат думает, что он курица.\n— Почему не лечите?\n— Нам нужны яйца.",
-    "— Папа, а правда, что деньги не пахнут?\n— Правда, сынок. Именно поэтому их так сложно найти.",
     "Объявление: «Продаю парашют. Б/У. Один раз не раскрылся. Торг уместен».",
     "— Дорогой, я записалась на курсы вождения.\n— Это хорошо.\n— Кстати, где наш кот?\n— Это плохо.",
     "Учитель: — Вася, назови трёх великих русских писателей!\nВася: — Пушкин, Лермонтов... и... телефон разрядился.",
-]
-
-CONTENT = [
-    '💬 «Жизнь — это то, что происходит с тобой, пока ты строишь другие планы.» — Джон Леннон',
-    '🧠 Загадка: Что всегда идёт, но никуда не приходит? (Время)',
-    '💬 «Единственный способ делать великую работу — любить то, что делаешь.» — Стив Джобс',
-    '🧠 Загадка: Чем больше берёшь, тем больше становится. Что это? (Яма)',
-    '💬 «В конце концов, не годы жизни считаются. Считается жизнь в годах.» — Авраам Линкольн',
-    '🧠 Загадка: Без рук, без ног, а ворота открывает. Что это? (Ветер)',
-    '💬 «Будь собой. Все остальные роли уже заняты.» — Оскар Уайльд',
-    '🧠 Загадка: Сам не ест, а всех кормит. Что это? (Ложка)',
-    '💬 «Успех — это умение идти от неудачи к неудаче, не теряя энтузиазма.» — Черчилль',
-    '🧠 Загадка: Что можно сломать словами, но не руками? (Молчание)',
-    '💬 «Счастье — это не станция назначения, а способ путешествовать.» — М. Л. Ранбек',
-    '🧠 Загадка: Что видит каждый, но потрогать не может? (Тень)',
-    '💬 «Лучшее время посадить дерево — 20 лет назад. Второе лучшее — сейчас.» — Китайская пословица',
-    '🧠 Загадка: Чем больше сохнет, тем мокрее становится. Что это? (Полотенце)',
-    '💬 «Воображение важнее знания.» — Альберт Эйнштейн',
-    '🧠 Загадка: Два кольца, два конца, а посередине гвоздик. Что это? (Ножницы)',
-    '💬 «Смелость — это не отсутствие страха, а преодоление его.» — Нельсон Мандела',
-    '🧠 Загадка: Четыре брата под одной шляпой стоят. Что это? (Стол)',
-    '💬 «Нет ничего постоянного, кроме перемен.» — Гераклит',
-    '🧠 Загадка: Что есть у каждого, но никто не может дать другому? (Имя)',
-    '💬 «Лучше зажечь одну свечу, чем проклинать темноту.» — Конфуций',
-    '🧠 Загадка: Что можно поймать, но не кинуть? (Насморк)',
-    '💬 «Жить — значит действовать.» — Оноре де Бальзак',
-    '🧠 Загадка: Всегда во рту, но не проглотить. Что это? (Язык)',
-    '💬 «Каждый день — это новая жизнь для мудрого человека.» — Уильям Блейк',
-    '🧠 Загадка: Что бежит без ног? (Вода)',
-    '💬 «Ошибка — это не неудача. Это урок.» — Генри Форд',
-    '🧠 Загадка: Маленький, кругленький, а за хвост не поймаешь. Что это? (Клубок)',
-    '💬 «Стремись не к успеху, а к тому, чтобы твоя жизнь имела смысл.» — Эйнштейн',
-    '🧠 Загадка: Умирает — воняет, рождается — пахнет. Что это? (Свеча)',
-    '💬 «В каждом человеке есть солнце. Только дайте ему светить.» — Сократ',
-    '🧠 Загадка: Без чего хлеб не испечёшь? (Без корки)',
-    '💬 «Тот, кто знает себя — просветлён.» — Лао-цзы',
-    '🧠 Загадка: Что нужно поднять, чтобы опустить? (Якорь)',
-    '💬 «Будущее принадлежит тем, кто верит в красоту своих мечтаний.» — Э. Рузвельт',
-    '🧠 Загадка: Не море, не земля — корабли не плавают, ходить нельзя. Что это? (Болото)',
-    '💬 «Ты не можешь изменить начало, но можешь изменить конец.» — К. С. Льюис',
-    '🧠 Загадка: У двух матерей по пять сыновей, одно имя всем. Что это? (Пальцы)',
-    '💬 «Делай что можешь, с тем что имеешь, там где ты есть.» — Теодор Рузвельт',
-    '🧠 Загадка: Стоит без ног, висит без рук, всем путь кажет. Что это? (Указатель)',
-    '💬 «Сначала они тебя не замечают, потом смеются, затем борются. А потом ты побеждаешь.» — Ганди',
-    '💬 «Чем больше я узнаю людей, тем больше люблю собак.» — Марк Твен',
-    '💬 «Мечтайте так, как будто будете жить вечно. Живите так, как будто умрёте сегодня.» — Джеймс Дин',
-    '💬 «Великие умы обсуждают идеи. Средние — события. Мелкие — людей.» — Э. Рузвельт',
-    '💬 «Жизнь — это 10% того, что с тобой происходит, и 90% того, как ты на это реагируешь.» — Свиндолл',
-    '💬 «Единственное реальное путешествие — это взгляд другими глазами.» — Марсель Пруст',
-    '💬 «Хочешь быть счастливым — будь им.» — Козьма Прутков',
-    '💬 «Если хочешь изменить мир — начни с себя.» — Махатма Ганди',
-    '💬 «Главное — никогда не переставать задавать вопросы.» — Альберт Эйнштейн',
-    '💬 «Тысячемильное путешествие начинается с одного шага.» — Лао-цзы',
-    '💬 «Самое тёмное время — перед рассветом.» — Томас Фуллер',
-    '💬 «Где есть желание, найдётся и путь.» — Уильям Хэзлитт',
-    '💬 «Творчество — это интеллект, получающий удовольствие.» — Альберт Эйнштейн',
-    '💬 «Риск — это плата за возможность.» — Хью Джекман',
-    '💬 «Не бойся медленно идти — бойся стоять на месте.» — Японская пословица',
-    '💬 «Дорогу осилит идущий.» — Народная мудрость',
-    '💬 «Тот, кто хочет — ищет возможности. Тот, кто не хочет — ищет причины.» — Сократ',
-    '💬 «Молчание — лучший ответ дураку.» — Восточная мудрость',
-    '💬 «Человеку нужно три вещи для счастья: кого любить, что делать и на что надеяться.» — Кант',
-    '💬 «Не важно, как медленно ты идёшь — главное не останавливаться.» — Конфуций',
 ]
 
 WMO_EMOJI = {
@@ -431,10 +361,7 @@ def get_news():
         return f"📰 Новости: не удалось получить данные ({e})"
 
 def get_science_news():
-    sources = [
-        "https://nauka.tass.ru/rss",
-        "https://naked-science.ru/rss",
-    ]
+    sources = ["https://nauka.tass.ru/rss", "https://naked-science.ru/rss"]
     for url in sources:
         try:
             items = _parse_rss_items(url, 4)
@@ -472,17 +399,32 @@ def get_commands_text():
         "Все команды через @Fuckbook1Bot"
     )
 
+ROAST_SYSTEM = (
+    "Ты — дерзкий, наглый, матерящийся собеседник с характером. Разговаривай как слегка подвыпивший приятель, "
+    "которому плевать на церемонии: напористо, с вызовом, подколами и чёрным юмором.\n"
+    "Матершина — обязательная часть речи. Пиши мат полностью, без звёздочек: «блядь», «сука», «нахуй», «ебать», "
+    "«охуеть», «пиздец», «хуйня», «заебись», «долбоёб» и подобные. Чередуй их естественно.\n"
+    "Можешь жёстко высмеивать людей, называть глупость хернёй. Не извиняйся за мат.\n"
+    "Пиши коротко и хлёстко — 1-3 предложения. Не угрожай и не оскорбляй по признакам "
+    "национальности, пола, религии или здоровья."
+)
+
 def ask_gpt(question: str, chat_id: str) -> str:
     try:
         client = OpenAI(api_key=OPENAI_API_KEY)
         history = get_history(chat_id)
         history_text = "\n".join(f"{m['name']}: {m['text']}" for m in history)
         now_moscow = datetime.utcnow() + timedelta(hours=3)
-        messages = [
-            {"role": "system", "content": f"Ты — Пятница, дружелюбный бот для группового чата друзей. Отвечай коротко, по-русски, неформально. Сегодня: {now_moscow.strftime('%d.%m.%Y')}, московское время: {now_moscow.strftime('%H:%M')}.\n\nПоследние сообщения в чате:\n{history_text}"},
-            {"role": "user", "content": question}
-        ]
-        response = client.chat.completions.create(model="gpt-4.1", messages=messages, max_tokens=500)
+        system_prompt = (
+            ROAST_SYSTEM + "\n\n"
+            f"Сегодня: {now_moscow.strftime('%d.%m.%Y')}, московское время: {now_moscow.strftime('%H:%M')}.\n\n"
+            f"Последние сообщения в чате:\n{history_text}"
+        )
+        response = client.chat.completions.create(
+            model="gpt-4.1",
+            messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": question}],
+            max_tokens=500
+        )
         return response.choices[0].message.content
     except Exception as e:
         return f"Ошибка: {e}"
@@ -520,6 +462,55 @@ def parse_poll(text: str):
     text = re.sub(r'голосование\s*', '', text, flags=re.IGNORECASE).strip()
     options = [o.strip() for o in re.split(r'\s+или\s+', text, flags=re.IGNORECASE) if o.strip()]
     return options if len(options) >= 2 else None
+
+async def random_roast(context: ContextTypes.DEFAULT_TYPE):
+    now_moscow = datetime.utcnow() + timedelta(hours=3)
+    if now_moscow.hour < 10 or now_moscow.hour >= 23:
+        return
+    for chat_id in ALLOWED_CHAT_IDS:
+        chat_key = str(chat_id)
+        history = load_json(CHAT_HISTORY_FILE)
+        messages = history.get(chat_key, [])
+        if len(messages) < 5:
+            continue
+        # Берём последние 30 сообщений
+        recent = messages[-30:]
+        # Собираем активных участников и их сообщения
+        active_users = {}
+        for m in recent:
+            name = m.get("name", "")
+            text = m.get("text", "")
+            if name and text and not text.startswith("/"):
+                if name not in active_users:
+                    active_users[name] = []
+                active_users[name].append(text)
+        if not active_users:
+            continue
+        # Выбираем случайного участника
+        target = random.choice(list(active_users.keys()))
+        target_msgs = active_users[target][:5]
+        history_text = "\n".join(f"{m['name']}: {m['text']}" for m in recent[-15:])
+        prompt = (
+            f"Недавние сообщения в чате:\n{history_text}\n\n"
+            f"Напиши один дерзкий, язвительный комментарий про {target} — "
+            f"в контексте того, что он писал. Обязательно упомяни имя {target}. "
+            f"Коротко, хлёстко, с матом. 1-2 предложения."
+        )
+        try:
+            client = OpenAI(api_key=OPENAI_API_KEY)
+            response = client.chat.completions.create(
+                model="gpt-4.1",
+                messages=[
+                    {"role": "system", "content": ROAST_SYSTEM},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=150
+            )
+            comment = response.choices[0].message.content
+            await context.bot.send_message(chat_id=chat_id, text=comment)
+        except Exception as e:
+            print(f"[random_roast] → {chat_id}: {e}")
+        await asyncio.sleep(3)
 
 async def morning_digest(context: ContextTypes.DEFAULT_TYPE):
     now_moscow = datetime.utcnow() + timedelta(hours=3)
@@ -575,27 +566,6 @@ async def evening_forecast(context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(chat_id=chat_id, text=text)
         except Exception as e:
             print(f"[evening_forecast] → {chat_id}: {e}")
-
-async def check_inactive_chats(context: ContextTypes.DEFAULT_TYPE):
-    now = datetime.utcnow()
-    if (now.hour + 3) % 24 < 9 or (now.hour + 3) % 24 >= 23:
-        return
-    chat_activity = load_json(LAST_CHAT_ACTIVITY_FILE)
-    content_index = load_json(CONTENT_INDEX_FILE)
-    for chat_id in ALLOWED_CHAT_IDS:
-        chat_key = str(chat_id)
-        if chat_key in chat_activity:
-            last_time = datetime.fromisoformat(chat_activity[chat_key])
-            if now - last_time >= timedelta(hours=INACTIVE_HOURS):
-                idx = content_index.get(chat_key, 0)
-                try:
-                    await context.bot.send_message(chat_id=chat_id, text=CONTENT[idx % len(CONTENT)])
-                except Exception as e:
-                    print(f"[check_inactive_chats] → {chat_id}: {e}")
-                content_index[chat_key] = (idx + 1) % len(CONTENT)
-                chat_activity[chat_key] = now.isoformat()
-    save_json(LAST_CHAT_ACTIVITY_FILE, chat_activity)
-    save_json(CONTENT_INDEX_FILE, content_index)
 
 async def check_reminders(context: ContextTypes.DEFAULT_TYPE):
     now_moscow = datetime.utcnow() + timedelta(hours=3)
@@ -716,11 +686,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, handle_message))
-    app.job_queue.run_repeating(check_inactive_chats, interval=600, first=60)
     app.job_queue.run_repeating(check_reminders, interval=60, first=10)
+    app.job_queue.run_repeating(random_roast, interval=10800, first=3600)  # каждые 3 часа
     app.job_queue.run_daily(morning_digest, time=time(6, 1))     # 09:01 МСК
     app.job_queue.run_daily(player_of_day, time=time(6, 3))      # 09:03 МСК
     app.job_queue.run_daily(daily_poll_job, time=time(8, 0))     # 11:00 МСК
     app.job_queue.run_daily(evening_forecast, time=time(20, 0))  # 23:00 МСК
-    print("Бот Пятница Про v9.9 запущен!")
+    print("Бот Пятница Про v10.1 запущен!")
     app.run_polling(drop_pending_updates=True)
