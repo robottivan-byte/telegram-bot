@@ -105,6 +105,16 @@ WMO_EMOJI = {
     95: "⛈", 96: "⛈", 99: "⛈",
 }
 
+ROAST_SYSTEM = (
+    "Ты — дерзкий, наглый, матерящийся собеседник с характером. Разговаривай как слегка подвыпивший приятель, "
+    "которому плевать на церемонии: напористо, с вызовом, подколами и чёрным юмором.\n"
+    "Матершина — обязательная часть речи. Пиши мат полностью, без звёздочек: «блядь», «сука», «нахуй», «ебать», "
+    "«охуеть», «пиздец», «хуйня», «заебись», «долбоёб» и подобные. Чередуй их естественно.\n"
+    "Можешь жёстко высмеивать людей, называть глупость хернёй. Не извиняйся за мат.\n"
+    "Пиши коротко и хлёстко. Не угрожай и не оскорбляй по признакам "
+    "национальности, пола, религии или здоровья."
+)
+
 def load_json(filename):
     if os.path.exists(filename):
         with open(filename, "r", encoding="utf-8") as f:
@@ -399,16 +409,6 @@ def get_commands_text():
         "Все команды через @Fuckbook1Bot"
     )
 
-ROAST_SYSTEM = (
-    "Ты — дерзкий, наглый, матерящийся собеседник с характером. Разговаривай как слегка подвыпивший приятель, "
-    "которому плевать на церемонии: напористо, с вызовом, подколами и чёрным юмором.\n"
-    "Матершина — обязательная часть речи. Пиши мат полностью, без звёздочек: «блядь», «сука», «нахуй», «ебать», "
-    "«охуеть», «пиздец», «хуйня», «заебись», «долбоёб» и подобные. Чередуй их естественно.\n"
-    "Можешь жёстко высмеивать людей, называть глупость хернёй. Не извиняйся за мат.\n"
-    "Пиши коротко и хлёстко — 1-3 предложения. Не угрожай и не оскорбляй по признакам "
-    "национальности, пола, религии или здоровья."
-)
-
 def ask_gpt(question: str, chat_id: str) -> str:
     try:
         client = OpenAI(api_key=OPENAI_API_KEY)
@@ -462,55 +462,6 @@ def parse_poll(text: str):
     text = re.sub(r'голосование\s*', '', text, flags=re.IGNORECASE).strip()
     options = [o.strip() for o in re.split(r'\s+или\s+', text, flags=re.IGNORECASE) if o.strip()]
     return options if len(options) >= 2 else None
-
-async def random_roast(context: ContextTypes.DEFAULT_TYPE):
-    now_moscow = datetime.utcnow() + timedelta(hours=3)
-    if now_moscow.hour < 10 or now_moscow.hour >= 23:
-        return
-    for chat_id in ALLOWED_CHAT_IDS:
-        chat_key = str(chat_id)
-        history = load_json(CHAT_HISTORY_FILE)
-        messages = history.get(chat_key, [])
-        if len(messages) < 5:
-            continue
-        # Берём последние 30 сообщений
-        recent = messages[-30:]
-        # Собираем активных участников и их сообщения
-        active_users = {}
-        for m in recent:
-            name = m.get("name", "")
-            text = m.get("text", "")
-            if name and text and not text.startswith("/"):
-                if name not in active_users:
-                    active_users[name] = []
-                active_users[name].append(text)
-        if not active_users:
-            continue
-        # Выбираем случайного участника
-        target = random.choice(list(active_users.keys()))
-        target_msgs = active_users[target][:5]
-        history_text = "\n".join(f"{m['name']}: {m['text']}" for m in recent[-15:])
-        prompt = (
-            f"Недавние сообщения в чате:\n{history_text}\n\n"
-            f"Напиши один дерзкий, язвительный комментарий про {target} — "
-            f"в контексте того, что он писал. Обязательно упомяни имя {target}. "
-            f"Коротко, хлёстко, с матом. 1-2 предложения."
-        )
-        try:
-            client = OpenAI(api_key=OPENAI_API_KEY)
-            response = client.chat.completions.create(
-                model="gpt-4.1",
-                messages=[
-                    {"role": "system", "content": ROAST_SYSTEM},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=150
-            )
-            comment = response.choices[0].message.content
-            await context.bot.send_message(chat_id=chat_id, text=comment)
-        except Exception as e:
-            print(f"[random_roast] → {chat_id}: {e}")
-        await asyncio.sleep(3)
 
 async def morning_digest(context: ContextTypes.DEFAULT_TYPE):
     now_moscow = datetime.utcnow() + timedelta(hours=3)
@@ -687,10 +638,9 @@ if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, handle_message))
     app.job_queue.run_repeating(check_reminders, interval=60, first=10)
-    app.job_queue.run_repeating(random_roast, interval=10800, first=3600)  # каждые 3 часа
     app.job_queue.run_daily(morning_digest, time=time(6, 1))     # 09:01 МСК
     app.job_queue.run_daily(player_of_day, time=time(6, 3))      # 09:03 МСК
     app.job_queue.run_daily(daily_poll_job, time=time(8, 0))     # 11:00 МСК
     app.job_queue.run_daily(evening_forecast, time=time(20, 0))  # 23:00 МСК
-    print("Бот Пятница Про v10.1 запущен!")
+    print("Бот Пятница Про v10.2 запущен!")
     app.run_polling(drop_pending_updates=True)
