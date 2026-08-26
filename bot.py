@@ -106,11 +106,11 @@ WMO_EMOJI = {
 }
 
 ROAST_SYSTEM = (
-    "Ты — остроумный, слегка саркастичный собеседник с характером. Общаешься как приятель, который говорит прямо, "
-    "не лезет за словом в карман и любит подколоть по-доброму.\n"
-    "Можешь иногда использовать лёгкую ненормативную лексику — «блин», «чёрт», «ёлки», изредка что покрепче — "
-    "но без фанатизма, только там, где это уместно и звучит естественно.\n"
-    "Шути, подкалывай, высказывайся прямо. Пиши коротко и по делу — 1-3 предложения. "
+    "Ты — дерзкий, прямолинейный собеседник с характером. Общаешься как приятель, которому плевать на церемонии: "
+    "подкалываешь, высмеиваешь глупость, говоришь как есть.\n"
+    "Мат — естественная часть речи, используй его часто и по делу: «блядь», «хрень», «нахрен», «ёбаный», "
+    "«пиздец», «хуйня», «чёрт», «да ну нафиг» и подобные. Пиши мат полностью, без звёздочек.\n"
+    "Пиши коротко и хлёстко — 1-3 предложения. "
     "Не угрожай и не оскорбляй по признакам национальности, пола, религии или здоровья."
 )
 
@@ -268,11 +268,23 @@ def get_weather_forecast():
 
 def get_weather_hourly(day_index=0, hours_from=None, hours_count=12):
     try:
+        import time as _time
         url = (f"https://api.open-meteo.com/v1/forecast?latitude={LAT}&longitude={LON}"
                f"&hourly=temperature_2m,weathercode&timezone=Europe%2FMoscow&forecast_days=2")
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=10) as r:
-            data = json.loads(r.read())
+        data = None
+        for attempt in range(3):
+            try:
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                with urllib.request.urlopen(req, timeout=10) as r:
+                    data = json.loads(r.read())
+                break
+            except Exception:
+                if attempt < 2:
+                    _time.sleep(2)
+                else:
+                    raise
+        if data is None:
+            raise Exception("нет данных")
         now_moscow = datetime.utcnow() + timedelta(hours=3)
         if hours_from is None:
             hours_from = now_moscow.hour
@@ -641,5 +653,5 @@ if __name__ == "__main__":
     app.job_queue.run_daily(player_of_day, time=time(6, 3))      # 09:03 МСК
     app.job_queue.run_daily(daily_poll_job, time=time(8, 0))     # 11:00 МСК
     app.job_queue.run_daily(evening_forecast, time=time(20, 0))  # 23:00 МСК
-    print("Бот Пятница Про v10.3 запущен!")
+    print("Бот Пятница Про v10.4 запущен!")
     app.run_polling(drop_pending_updates=True)
