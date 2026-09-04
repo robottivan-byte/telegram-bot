@@ -44,29 +44,6 @@ PLAYER_TITLES = [
     "🎪 Шоумен дня", "🏄 Сёрфер волн",
 ]
 
-POLL_QUESTIONS = [
-    ("Что лучше?", ["Море", "Горы", "Лес", "Город"]),
-    ("Когда лучше просыпаться?", ["До 7 утра", "7-9 утра", "9-11 утра", "После 11"]),
-    ("Что важнее?", ["Деньги", "Здоровье", "Любовь", "Свобода"]),
-    ("Какой сезон лучший?", ["Весна", "Лето", "Осень", "Зима"]),
-    ("Чем заняться в выходные?", ["Дома отдохнуть", "На природу", "С друзьями", "Хобби"]),
-    ("Кофе или чай?", ["Кофе", "Чай", "Другое", "Не пью"]),
-    ("Какое кино на вечер?", ["Комедия", "Боевик", "Триллер", "Документалка"]),
-    ("Как отметить День рождения?", ["Дома с близкими", "В ресторане", "На природе", "Уехать"]),
-    ("Что выберешь?", ["Много денег", "Здоровье", "Любовь", "Слава"]),
-    ("Где комфортнее жить?", ["Большой город", "Маленький город", "Деревня", "Без разницы"]),
-    ("Какой спорт смотреть?", ["Футбол", "Хоккей", "Теннис", "Не смотрю"]),
-    ("Что слушаешь?", ["Русская музыка", "Зарубежная", "Классика", "Подкасты"]),
-    ("Как провести отпуск?", ["Пляж и море", "Города", "Горы/походы", "Дома"]),
-    ("Что важнее в работе?", ["Зарплата", "Коллектив", "Интерес", "Гибкий график"]),
-    ("Домашнее животное?", ["Кошка", "Собака", "Другое", "Не хочу"]),
-    ("Любимое время суток?", ["Утро", "День", "Вечер", "Ночь"]),
-    ("Как отдыхаешь?", ["Активно", "Пассивно", "По настроению", "Какой отдых?"]),
-    ("Что закажешь на ужин?", ["Пиццу", "Суши", "Бургер", "Домашнее"]),
-    ("Ты сова или жаворонок?", ["Сова 🦉", "Жаворонок 🐦", "Ни то ни другое", "Смотря день"]),
-    ("Как предпочитаешь общаться?", ["Лично", "Звонок", "Сообщения", "Как придётся"]),
-]
-
 JOKES = [
     "— Доктор, у меня проблемы с памятью.\n— И давно?\n— Что давно?",
     "— Ты чего грустный?\n— Жена ушла к соседу.\n— Найдёшь другую.\n— Другую найду, но в шашки кто играть будет?",
@@ -509,17 +486,21 @@ async def player_of_day(context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             print(f"[player_of_day] → {chat_id}: {e}")
 
-async def daily_poll_job(context: ContextTypes.DEFAULT_TYPE):
+async def daily_joke_job(context: ContextTypes.DEFAULT_TYPE):
     content_index = load_json(CONTENT_INDEX_FILE)
-    poll_idx = content_index.get("poll_index", 0)
-    question, options = POLL_QUESTIONS[poll_idx % len(POLL_QUESTIONS)]
-    content_index["poll_index"] = (poll_idx + 1) % len(POLL_QUESTIONS)
+    order = content_index.get("joke_order", [])
+    if not order:
+        order = list(range(len(JOKES)))
+        random.shuffle(order)
+    idx = order.pop(0)
+    content_index["joke_order"] = order
     save_json(CONTENT_INDEX_FILE, content_index)
+    joke = JOKES[idx]
     for chat_id in ALLOWED_CHAT_IDS:
         try:
-            await context.bot.send_poll(chat_id=chat_id, question=f"🎯 Вопрос дня: {question}", options=options, is_anonymous=False)
+            await context.bot.send_message(chat_id=chat_id, text=f"😂 Анекдот дня:\n\n{joke}")
         except Exception as e:
-            print(f"[daily_poll] → {chat_id}: {e}")
+            print(f"[daily_joke] → {chat_id}: {e}")
 
 async def evening_forecast(context: ContextTypes.DEFAULT_TYPE):
     text = f"🌙 Вечерняя сводка:\n\n{get_weather_hourly(day_index=1, hours_from=0, hours_count=24)}"
@@ -651,7 +632,7 @@ if __name__ == "__main__":
     app.job_queue.run_repeating(check_reminders, interval=60, first=10)
     app.job_queue.run_daily(morning_digest, time=time(6, 1))     # 09:01 МСК
     app.job_queue.run_daily(player_of_day, time=time(6, 3))      # 09:03 МСК
-    app.job_queue.run_daily(daily_poll_job, time=time(8, 0))     # 11:00 МСК
+    app.job_queue.run_daily(daily_joke_job, time=time(8, 0))     # 11:00 МСК
     app.job_queue.run_daily(evening_forecast, time=time(20, 0))  # 23:00 МСК
-    print("Бот Пятница Про v10.4 запущен!")
+    print("Бот Пятница Про v10.5 запущен!")
     app.run_polling(drop_pending_updates=True)
