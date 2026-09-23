@@ -373,6 +373,21 @@ def get_science_news():
             continue
     return "🔬 Наука: не удалось получить данные"
 
+def get_random_joke() -> str:
+    try:
+        req = urllib.request.Request(
+            "https://randstuff.ru/joke/",
+            headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=10) as r:
+            data = json.loads(r.read())
+        joke = data.get("joke", {}).get("content", "").strip()
+        if joke:
+            return joke
+    except Exception:
+        pass
+    return random.choice(JOKES)
+
 def get_commands_text():
     return (
         "📋 Доступные команды:\n\n"
@@ -495,7 +510,7 @@ async def daily_joke_job(context: ContextTypes.DEFAULT_TYPE):
     idx = order.pop(0)
     content_index["joke_order"] = order
     save_json(CONTENT_INDEX_FILE, content_index)
-    joke = JOKES[idx]
+    joke = get_random_joke()
     for chat_id in ALLOWED_CHAT_IDS:
         try:
             await context.bot.send_message(chat_id=chat_id, text=f"😂 Анекдот дня:\n\n{joke}")
@@ -595,7 +610,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif re.search(r'^события$|^праздники$', question, re.IGNORECASE):
             await msg.reply_text(get_events())
         elif re.search(r'^анекдот$', question, re.IGNORECASE):
-            await msg.reply_text(random.choice(JOKES))
+            await msg.reply_text(get_random_joke())
         elif re.search(r'^рандом\s+\d+\s+\d+', question, re.IGNORECASE):
             parts = re.findall(r'\d+', question)
             if len(parts) >= 2:
@@ -634,5 +649,5 @@ if __name__ == "__main__":
     app.job_queue.run_daily(player_of_day, time=time(6, 3))      # 09:03 МСК
     app.job_queue.run_daily(daily_joke_job, time=time(8, 0))     # 11:00 МСК
     app.job_queue.run_daily(evening_forecast, time=time(20, 0))  # 23:00 МСК
-    print("Бот Пятница Про v10.5 запущен!")
+    print("Бот Пятница Про v10.6 запущен!")
     app.run_polling(drop_pending_updates=True)
