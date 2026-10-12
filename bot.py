@@ -427,7 +427,7 @@ def ask_gpt(question: str, chat_id: str) -> str:
             f"Последние сообщения в чате:\n{history_text}"
         )
         response = client.chat.completions.create(
-            model="gpt-5.6-terra",
+            model="gpt-6.1-sol",
             messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": question}],
             max_completion_tokens=500
         )
@@ -644,5 +644,5 @@ if __name__ == "__main__":
     app.job_queue.run_daily(player_of_day, time=time(6, 3))      # 09:03 МСК
     app.job_queue.run_daily(daily_joke_job, time=time(8, 0))     # 11:00 МСК
     app.job_queue.run_daily(evening_forecast, time=time(20, 0))  # 23:00 МСК
-    print("Бот Пятница Про v10.12 запущен!")
+    print("Бот Пятница Про v10.13 запущен!")
     app.run_polling(drop_pending_updates=True)
