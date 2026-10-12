@@ -16,7 +16,7 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 ALLOWED_CHAT_IDS = [-5102540817, -437147591, -5182288388]
 BOT_USERNAME = "Fuckbook1Bot"
 AWAY_THRESHOLD_HOURS = 3
-HISTORY_LIMIT = 50
+HISTORY_LIMIT = 100
 LAST_SEEN_FILE = "last_seen.json"
 LAST_CHAT_ACTIVITY_FILE = "last_chat_activity.json"
 CHAT_HISTORY_FILE = "chat_history.json"
@@ -370,18 +370,25 @@ def get_science_news():
     return "🔬 Наука: не удалось получить данные"
 
 def get_random_joke() -> str:
-    try:
-        req = urllib.request.Request(
-            "https://randstuff.ru/joke/",
-            headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
-        )
-        with urllib.request.urlopen(req, timeout=10) as r:
-            data = json.loads(r.read())
-        joke = data.get("joke", {}).get("content", "").strip()
-        if joke:
-            return joke
-    except Exception:
-        pass
+    sources = [
+        ("https://randstuff.ru/joke/", lambda d: d.get("joke", {}).get("content", "").strip()),
+        ("https://randstuff.ru/joke/?json=1", lambda d: d.get("joke", {}).get("content", "").strip()),
+        ("https://anecdotica.ru/api/?type=random", lambda d: d.get("item", {}).get("text", "").strip()),
+    ]
+    for url, extractor in sources:
+        try:
+            req = urllib.request.Request(
+                url,
+                headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
+            )
+            with urllib.request.urlopen(req, timeout=10) as r:
+                raw = r.read()
+            data = json.loads(raw)
+            joke = extractor(data)
+            if joke:
+                return joke
+        except Exception:
+            continue
     return "😅 Не удалось загрузить анекдот, попробуй позже."
 
 def get_commands_text():
@@ -420,7 +427,7 @@ def ask_gpt(question: str, chat_id: str) -> str:
             f"Последние сообщения в чате:\n{history_text}"
         )
         response = client.chat.completions.create(
-            model="gpt-4.1",
+            model="gpt-5.6-terra",
             messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": question}],
             max_tokens=500
         )
@@ -637,5 +644,5 @@ if __name__ == "__main__":
     app.job_queue.run_daily(player_of_day, time=time(6, 3))      # 09:03 МСК
     app.job_queue.run_daily(daily_joke_job, time=time(8, 0))     # 11:00 МСК
     app.job_queue.run_daily(evening_forecast, time=time(20, 0))  # 23:00 МСК
-    print("Бот Пятница Про v10.9 запущен!")
+    print("Бот Пятница Про v10.11 запущен!")
     app.run_polling(drop_pending_updates=True)
