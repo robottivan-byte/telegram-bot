@@ -6,13 +6,13 @@ import asyncio
 import html
 import xml.etree.ElementTree as ET
 import urllib.request
+import anthropic
 from datetime import datetime, timedelta, time
 from telegram import Update, ReactionTypeEmoji
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
-from openai import OpenAI
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 ALLOWED_CHAT_IDS = [-5102540817, -437147591, -5182288388]
 BOT_USERNAME = "Fuckbook1Bot"
 AWAY_THRESHOLD_HOURS = 3
@@ -417,7 +417,7 @@ def get_commands_text():
 
 def ask_gpt(question: str, chat_id: str) -> str:
     try:
-        client = OpenAI(api_key=OPENAI_API_KEY)
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
         history = get_history(chat_id)
         history_text = "\n".join(f"{m['name']}: {m['text']}" for m in history)
         now_moscow = datetime.utcnow() + timedelta(hours=3)
@@ -426,12 +426,13 @@ def ask_gpt(question: str, chat_id: str) -> str:
             f"Сегодня: {now_moscow.strftime('%d.%m.%Y')}, московское время: {now_moscow.strftime('%H:%M')}.\n\n"
             f"Последние сообщения в чате:\n{history_text}"
         )
-        response = client.chat.completions.create(
-            model="gpt-6.1-sol",
-            messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": question}],
-            max_completion_tokens=500
+        response = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=500,
+            system=system_prompt,
+            messages=[{"role": "user", "content": question}]
         )
-        return response.choices[0].message.content
+        return response.content[0].text
     except Exception as e:
         return f"Ошибка: {e}"
 
@@ -644,5 +645,5 @@ if __name__ == "__main__":
     app.job_queue.run_daily(player_of_day, time=time(6, 3))      # 09:03 МСК
     app.job_queue.run_daily(daily_joke_job, time=time(8, 0))     # 11:00 МСК
     app.job_queue.run_daily(evening_forecast, time=time(20, 0))  # 23:00 МСК
-    print("Бот Пятница Про v10.13 запущен!")
+    print("Бот Пятница Про v10.14 запущен!")
     app.run_polling(drop_pending_updates=True)
