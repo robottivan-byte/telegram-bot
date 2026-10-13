@@ -6,10 +6,10 @@ import asyncio
 import html
 import xml.etree.ElementTree as ET
 import urllib.request
-import anthropic
 from datetime import datetime, timedelta, time
 from telegram import Update, ReactionTypeEmoji
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
+import anthropic
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
@@ -66,6 +66,7 @@ POLL_QUESTIONS = [
     ("Ты сова или жаворонок?", ["Сова 🦉", "Жаворонок 🐦", "Ни то ни другое", "Смотря день"]),
     ("Как предпочитаешь общаться?", ["Лично", "Звонок", "Сообщения", "Как придётся"]),
 ]
+
 
 WMO_EMOJI = {
     0: "☀️", 1: "🌤", 2: "⛅", 3: "☁️",
@@ -372,9 +373,8 @@ def get_science_news():
 
 def get_random_joke() -> str:
     sources = [
-        ("https://randstuff.ru/joke/", lambda d: d.get("joke", {}).get("content", "").strip()),
-        ("https://randstuff.ru/joke/?json=1", lambda d: d.get("joke", {}).get("content", "").strip()),
-        ("https://anecdotica.ru/api/?type=random", lambda d: d.get("item", {}).get("text", "").strip()),
+        ("https://v2.jokeapi.dev/joke/Any?lang=ru&type=single", lambda d: d.get("joke", "").strip()),
+        ("https://v2.jokeapi.dev/joke/Any?type=single", lambda d: d.get("joke", "").strip()),
     ]
     for url, extractor in sources:
         try:
@@ -383,8 +383,9 @@ def get_random_joke() -> str:
                 headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
             )
             with urllib.request.urlopen(req, timeout=10) as r:
-                raw = r.read()
-            data = json.loads(raw)
+                data = json.loads(r.read())
+            if data.get("error"):
+                continue
             joke = extractor(data)
             if joke:
                 return joke
