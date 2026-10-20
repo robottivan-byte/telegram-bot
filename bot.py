@@ -67,6 +67,7 @@ POLL_QUESTIONS = [
     ("Как предпочитаешь общаться?", ["Лично", "Звонок", "Сообщения", "Как придётся"]),
 ]
 
+
 WMO_EMOJI = {
     0: "☀️", 1: "🌤", 2: "⛅", 3: "☁️",
     45: "🌫", 48: "🌫",
@@ -370,27 +371,6 @@ def get_science_news():
             continue
     return "🔬 Наука: не удалось получить данные"
 
-def get_random_joke() -> str:
-    sources = [
-        ("https://v2.jokeapi.dev/joke/Any?lang=ru&type=single", lambda d: d.get("joke", "").strip()),
-        ("https://v2.jokeapi.dev/joke/Any?type=single", lambda d: d.get("joke", "").strip()),
-    ]
-    for url, extractor in sources:
-        try:
-            req = urllib.request.Request(
-                url,
-                headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
-            )
-            with urllib.request.urlopen(req, timeout=10) as r:
-                data = json.loads(r.read())
-            if data.get("error"):
-                continue
-            joke = extractor(data)
-            if joke:
-                return joke
-        except Exception:
-            continue
-    return "😅 Не удалось загрузить анекдот, попробуй позже."
 
 def get_commands_text():
     return (
@@ -405,7 +385,6 @@ def get_commands_text():
         "📰 новости — топ новости со ссылками\n"
         "🔬 наука — новости науки со ссылками\n"
         "🗓 события — ближайшие праздники\n"
-        "😂 анекдот — случайный анекдот\n"
         "🎲 рандом 1 100 — случайное число\n"
         "📊 статистика — кто больше всех пишет\n"
         "👤 сколько отсутствовал Имя\n"
@@ -506,13 +485,6 @@ async def player_of_day(context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             print(f"[player_of_day] → {chat_id}: {e}")
 
-async def daily_joke_job(context: ContextTypes.DEFAULT_TYPE):
-    joke = get_random_joke()
-    for chat_id in ALLOWED_CHAT_IDS:
-        try:
-            await context.bot.send_message(chat_id=chat_id, text=f"😂 Анекдот дня:\n\n{joke}")
-        except Exception as e:
-            print(f"[daily_joke] → {chat_id}: {e}")
 
 async def evening_forecast(context: ContextTypes.DEFAULT_TYPE):
     text = f"🌙 Вечерняя сводка:\n\n{get_weather_hourly(day_index=1, hours_from=0, hours_count=24)}"
@@ -606,8 +578,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.reply_text(get_science_news(), parse_mode="HTML", disable_web_page_preview=True)
         elif re.search(r'^события$|^праздники$', question, re.IGNORECASE):
             await msg.reply_text(get_events())
-        elif re.search(r'^анекдот$', question, re.IGNORECASE):
-            await msg.reply_text(get_random_joke())
         elif re.search(r'^рандом\s+\d+\s+\d+', question, re.IGNORECASE):
             parts = re.findall(r'\d+', question)
             if len(parts) >= 2:
@@ -644,7 +614,6 @@ if __name__ == "__main__":
     app.job_queue.run_repeating(check_reminders, interval=60, first=10)
     app.job_queue.run_daily(morning_digest, time=time(6, 1))     # 09:01 МСК
     app.job_queue.run_daily(player_of_day, time=time(6, 3))      # 09:03 МСК
-    app.job_queue.run_daily(daily_joke_job, time=time(8, 0))     # 11:00 МСК
     app.job_queue.run_daily(evening_forecast, time=time(20, 0))  # 23:00 МСК
     print("Бот Пятница Про v10.15 запущен!")
     app.run_polling(drop_pending_updates=True)
